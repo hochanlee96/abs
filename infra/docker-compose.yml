@@ -1,42 +1,41 @@
-version: '3.8'
-
 services:
   mariadb:
-    image: mariadb:10.6
-    restart: always
+    image: mariadb:10.11
     environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: mydb
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: baseball
+      MARIADB_USER: app
+      MARIADB_PASSWORD: app
     ports:
       - "3306:3306"
     volumes:
-      - mariadb_data:/var/lib/mysql
       - ./initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   api:
     build: ../apps/api
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - ../apps/api:/app
+    environment:
+      DATABASE_URL: "mysql+pymysql://app:app@mariadb:3306/baseball"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-placeholder_client_id}"
     ports:
       - "8000:8000"
     depends_on:
-      - mariadb
-    environment:
-      DATABASE_URL: mysql+pymysql://user:password@mariadb/mydb
+      mariadb:
+        condition: service_healthy
 
   web:
     build: ../apps/web
-    command: npm run dev
-    volumes:
-      - ../apps/web:/app
-      - /app/node_modules
+    environment:
+      NEXTAUTH_URL: "http://localhost:3000"
+      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET:-placeholder_secret}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-placeholder_client_id}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-placeholder_client_secret}"
+      NEXT_PUBLIC_API_BASE_URL: "http://localhost:8000"
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-
-volumes:
-  mariadb_data:
+    depends_on:
+      - api

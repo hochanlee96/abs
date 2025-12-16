@@ -1,6 +1,4 @@
-fastapi
-uvicorn
-websockets
-sqlalchemy
-pymysql
-python-multipart
+fastapi[standard]==0.115.0
+sqlalchemy==2.0.36
+pymysql==1.1.1
+google-auth==2.36.0

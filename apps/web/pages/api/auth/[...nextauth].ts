@@ -1,15 +1,23 @@
-import NextAuth from "next-auth"
-import GithubProvider from "next-auth/providers/github"
+import NextAuth from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
 
-export const authOptions = {
-  // Configure one or more authentication providers
+export default NextAuth({
   providers: [
-    GithubProvider({
-      clientId: process.env.GITHUB_ID || "",
-      clientSecret: process.env.GITHUB_SECRET || "",
-    }),
-    // ...add more providers here
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: { params: { scope: "openid email profile" } }
+    })
   ],
-}
-
-export default NextAuth(authOptions)
+  callbacks: {
+    async jwt({ token, account }) {
+      // Google provider가 id_token을 내려주는 경우가 많음
+      if (account?.id_token) (token as any).id_token = account.id_token;
+      return token;
+    },
+    async session({ session, token }) {
+      (session as any).id_token = (token as any).id_token;
+      return session;
+    }
+  }
+});
