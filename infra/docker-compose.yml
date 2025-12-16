@@ -7,11 +7,11 @@ services:
       MARIADB_USER: app
       MARIADB_PASSWORD: app
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - ./initdb:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      test: [ "CMD", "mariadb-admin", "ping", "-h", "localhost" ]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -21,6 +21,7 @@ services:
     environment:
       DATABASE_URL: "mysql+pymysql://app:app@mariadb:3306/baseball"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-placeholder_client_id}"
+      DEV_MODE: "true"
     ports:
       - "8000:8000"
     depends_on:
