@@ -7,7 +7,24 @@ from .crud_accounts import upsert_account_from_google
 from .models import Base
 from .db import engine
 
+from .routers import game
+
 app = FastAPI(title="Baseball Sim API")
+
+@app.on_event("startup")
+def startup_event():
+    from .db import SessionLocal
+    from . import crud_game
+    db = SessionLocal()
+    try:
+        trainings = crud_game.get_trainings(db)
+        if not trainings:
+            crud_game.create_training(db, "Weightlifting", power_delta=1)
+            crud_game.create_training(db, "Running", speed_delta=1)
+            crud_game.create_training(db, "Batting Practice", contact_delta=1)
+            print("Seeded initial trainings")
+    finally:
+        db.close()
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,6 +33,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(game.router, prefix="/api/v1", tags=["game"])
 
 @app.get("/health")
 def health():

@@ -27,6 +27,8 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
+    volumes:
+      - ../apps/api:/app
 
   web:
     build: ../apps/web
@@ -40,3 +42,6 @@ services:
       - "3000:3000"
     depends_on:
       - api
+    volumes:
+      - ../apps/web:/app
+      - /app/node_modules

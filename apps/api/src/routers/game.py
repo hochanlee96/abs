@@ -25,6 +25,9 @@ class CharacterCreate(BaseModel):
     nickname: str
     owner_account_id: Optional[int] = None
     is_user_created: bool = False
+    contact: int = 0
+    power: int = 0
+    speed: int = 0
 
 class MatchCreate(BaseModel):
     world_id: int
@@ -34,30 +37,23 @@ class MatchCreate(BaseModel):
 class TrainingPerform(BaseModel):
     training_id: int
 
-# Endpoints
-
-@router.post("/worlds")
-def create_world(world: WorldCreate, db: Session = Depends(get_db)):
-    return crud_game.create_world(db, world.world_name)
-
-@router.get("/worlds")
-def list_worlds(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return crud_game.get_worlds(db, skip, limit)
-
-@router.post("/teams")
-def create_team(team: TeamCreate, db: Session = Depends(get_db)):
-    return crud_game.create_team(db, team.world_id, team.team_name, team.user_character_id)
-
-@router.get("/teams/{team_id}")
-def get_team(team_id: int, db: Session = Depends(get_db)):
-    team = crud_game.get_team(db, team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    return team
-
 @router.post("/characters")
 def create_character(char: CharacterCreate, db: Session = Depends(get_db)):
-    return crud_game.create_character(db, char.world_id, char.nickname, char.owner_account_id, char.is_user_created)
+    if char.is_user_created:
+        total_points = char.contact + char.power + char.speed
+        if total_points != 10:
+            raise HTTPException(status_code=400, detail="Total stat points must be exactly 10")
+            
+    return crud_game.create_character(
+        db, 
+        char.world_id, 
+        char.nickname, 
+        char.owner_account_id, 
+        char.is_user_created,
+        char.contact,
+        char.power,
+        char.speed
+    )
 
 @router.get("/characters/{character_id}")
 def get_character(character_id: int, db: Session = Depends(get_db)):

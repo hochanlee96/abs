@@ -37,13 +37,19 @@ def create_character(
     world_id: int, 
     nickname: str, 
     owner_account_id: Optional[int] = None, 
-    is_user_created: bool = False
+    is_user_created: bool = False,
+    contact: int = 0,
+    power: int = 0,
+    speed: int = 0
 ) -> Character:
     char = Character(
         world_id=world_id, 
         nickname=nickname, 
         owner_account_id=owner_account_id, 
-        is_user_created=is_user_created
+        is_user_created=is_user_created,
+        contact=contact,
+        power=power,
+        speed=speed
     )
     db.add(char)
     db.commit()
