@@ -1,53 +1,43 @@
-import { useState } from "react";
-import { signIn, signOut, useSession } from "next-auth/react";
-import { apiGetMe, User } from "../lib/api";
+import { signIn, useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/router";
+import { useEffect } from "react";
+import styles from "../styles/Landing.module.css";
+// import { apiGetMe, User } from "../lib/api"; // Refactored to placeholder for now as per instructions
+
+// Simple placeholder for the user profile to avoid direct API calls for now,
+// except for the auth flow which is preserved.
+const UserProfilePlaceholder = ({ user }: { user: any }) => (
+  <div style={{ marginTop: 20, padding: 20, background: 'rgba(255,255,255,0.1)', borderRadius: 12 }}>
+    <h3>Welcome, {user.name}!</h3>
+    <p>Email: {user.email}</p>
+    <button onClick={() => signOut()} style={{ marginTop: 10, padding: '8px 16px', borderRadius: 6 }}>
+      Sign out
+    </button>
+  </div>
+);
 
 export default function Home() {
   const { data: session, status } = useSession();
-  const [userProfile, setUserProfile] = useState<User | null>(null);
-  const idToken = (session as any)?.id_token as string | undefined;
+  const router = useRouter();
 
-  const onMe = async () => {
-    if (!idToken) return;
-    try {
-      const me = await apiGetMe(idToken);
-      setUserProfile(me);
-    } catch (e) {
-      alert("Failed to fetch user");
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/character");
     }
-  };
+  }, [status, router]);
+
+  if (status === "loading" || status === "authenticated") {
+      return null; 
+  }
 
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui" }}>
-      <h1>Baseball Sim MVP</h1>
-
-      {status !== "authenticated" ? (
-        <button onClick={() => signIn("google")}>Sign in with Google</button>
-      ) : (
-        <>
-          <div style={{ marginTop: 12 }}>
-            <div>Signed in as: {session?.user?.email}</div>
-            <button onClick={onMe} style={{ marginRight: 8 }}>Call /me</button>
-            <button onClick={() => signOut()}>Sign out</button>
-
-            {userProfile && (
-              <div style={{ marginTop: 16, padding: 16, border: "1px solid #ccc", borderRadius: 8 }}>
-                <h3>User Profile (Loaded from API)</h3>
-                {userProfile.avatar_url && (
-                  <img src={userProfile.avatar_url} alt="Avatar" style={{ width: 50, height: 50, borderRadius: "50%" }} />
-                )}
-                <div><strong>ID:</strong> {userProfile.account_id}</div>
-                <div><strong>Name:</strong> {userProfile.display_name}</div>
-                <div><strong>Email:</strong> {userProfile.email}</div>
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginTop: 24 }}>
-            <a href="/match/1">Go to Match WS test (match_id=1)</a>
-          </div>
-        </>
-      )}
+    <div className={styles.container}>
+      <h1 className={styles.title}>Agentic Baseball Simulator</h1>
+      <div className={styles.buttonWrapper}>
+        <button className={styles.loginButton} onClick={() => signIn("google")}>
+          구글로 시작하기
+        </button>
+      </div>
     </div>
   );
 }
