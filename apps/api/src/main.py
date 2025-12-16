@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, Header, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from .db import get_db
 from .auth_google import verify_google_id_token_from_header
@@ -7,6 +8,14 @@ from .models import Base
 from .db import engine
 
 app = FastAPI(title="Baseball Sim API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health():
