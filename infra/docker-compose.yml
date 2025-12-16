@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:10.6
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: mydb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./initdb:/docker-entrypoint-initdb.d
+
+  api:
+    build: ../apps/api
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ../apps/api:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mariadb
+    environment:
+      DATABASE_URL: mysql+pymysql://user:password@mariadb/mydb
+
+  web:
+    build: ../apps/web
+    command: npm run dev
+    volumes:
+      - ../apps/web:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+
+volumes:
+  mariadb_data:
