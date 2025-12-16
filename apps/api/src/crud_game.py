@@ -62,6 +62,14 @@ def get_character(db: Session, character_id: int) -> Optional[Character]:
 def get_characters_by_account(db: Session, account_id: int) -> List[Character]:
     return db.execute(select(Character).where(Character.owner_account_id == account_id)).scalars().all()
 
+def delete_character(db: Session, character_id: int) -> bool:
+    char = get_character(db, character_id)
+    if char:
+        db.delete(char)
+        db.commit()
+        return True
+    return False
+
 # Match
 def create_match(db: Session, world_id: int, home_team_id: int, away_team_id: int) -> Match:
     match = Match(

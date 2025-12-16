@@ -37,6 +37,25 @@ class MatchCreate(BaseModel):
 class TrainingPerform(BaseModel):
     training_id: int
 
+@router.post("/worlds")
+def create_world(world: WorldCreate, db: Session = Depends(get_db)):
+    return crud_game.create_world(db, world.world_name)
+
+@router.get("/worlds")
+def list_worlds(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud_game.get_worlds(db, skip, limit)
+
+@router.post("/teams")
+def create_team(team: TeamCreate, db: Session = Depends(get_db)):
+    return crud_game.create_team(db, team.world_id, team.team_name, team.user_character_id)
+
+@router.get("/teams/{team_id}")
+def get_team(team_id: int, db: Session = Depends(get_db)):
+    team = crud_game.get_team(db, team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return team
+
 @router.post("/characters")
 def create_character(char: CharacterCreate, db: Session = Depends(get_db)):
     if char.is_user_created:
@@ -61,6 +80,21 @@ def get_character(character_id: int, db: Session = Depends(get_db)):
     if not char:
         raise HTTPException(status_code=404, detail="Character not found")
     return char
+
+@router.delete("/characters/{character_id}")
+def delete_character(character_id: int, db: Session = Depends(get_db), payload: dict = Depends(verify_google_id_token_from_header)):
+    # Optional: Verify ownership
+    acc = upsert_account_from_google(db, payload)
+    char = crud_game.get_character(db, character_id)
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if char.owner_account_id != acc.account_id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this character")
+        
+    success = crud_game.delete_character(db, character_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete character")
+    return {"status": "success"}
 
 @router.post("/matches")
 def create_match(match: MatchCreate, db: Session = Depends(get_db)):

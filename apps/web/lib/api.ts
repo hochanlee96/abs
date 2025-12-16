@@ -16,58 +16,74 @@ export async function apiGetMe(idToken: string): Promise<User> {
 }
 
 export interface Character {
-  id: number;
-  user_id: number;
+  character_id: number;
+  world_id: number;
+  owner_account_id: number;
   nickname: string;
   contact: number;
   power: number;
   speed: number;
   created_at: string;
+  is_user_created: boolean;
 }
 
 export async function apiGetMyCharacter(idToken: string): Promise<Character | null> {
-  // Check if character exists in localStorage for mock persistence
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('mock_character');
-    if (saved) return JSON.parse(saved);
-  }
-
-  // Real API call would go here:
-  // const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/my-character`, { ... });
-
-  // Return null to simulate "Character does not exist"
-  return null;
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/me/characters`, {
+    headers: { Authorization: `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  const chars = await res.json();
+  return chars.length > 0 ? chars[0] : null;
 }
 
 export async function apiCreateCharacter(idToken: string, data: { nickname: string; contact: number; power: number; speed: number }): Promise<Character> {
-  // Mock creation
-  const newChar: Character = {
-    id: Date.now(),
-    user_id: 123, // mock
-    nickname: data.nickname,
-    contact: data.contact,
-    power: data.power,
-    speed: data.speed,
-    created_at: new Date().toISOString()
-  };
+  // 1. Create a World for this character (MVP simplification)
+  const worldRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/worlds`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ world_name: `World for ${data.nickname} ${Date.now()}` })
+  });
+  if (!worldRes.ok) throw new Error("Failed to create world");
+  const world = await worldRes.json();
 
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('mock_character', JSON.stringify(newChar));
+  // 2. Get User Profile to get account_id (needed for owner_account_id)
+  // Actually, the backend create_character endpoint takes owner_account_id.
+  // But wait, the backend endpoint `create_character` doesn't automatically set owner from token?
+  // It takes `owner_account_id` in the body.
+  // So we need to fetch /me first to get the ID.
+
+  const me = await apiGetMe(idToken);
+
+  // 3. Create Character
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/characters`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      world_id: world.world_id,
+      nickname: data.nickname,
+      owner_account_id: me.account_id,
+      is_user_created: true,
+      contact: data.contact,
+      power: data.power,
+      speed: data.speed
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to create character");
   }
-
-  return newChar;
+  return res.json();
 }
 
 export async function apiDeleteCharacter(idToken: string): Promise<void> {
-  // Mock deletion - remove from localStorage
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('mock_character');
-  }
+  // First get the character to know the ID
+  const char = await apiGetMyCharacter(idToken);
+  if (!char) return;
 
-  // Real API call would go here:
-  // const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/my-character`, {
-  //   method: 'DELETE',
-  //   headers: { Authorization: `Bearer ${idToken}` }
-  // });
-  // if (!res.ok) throw new Error(`API error: ${res.status}`);
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/characters/${char.character_id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
