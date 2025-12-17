@@ -219,6 +219,8 @@ class GameState(BaseModel):
         return {"name": "None", "stats": {}}
 
 
+
+
 # --- IO / Broadcast Models ---
 
 class SimulationResult(BaseModel):
@@ -226,7 +228,13 @@ class SimulationResult(BaseModel):
     result_code: str # HIT, OUT, HOMERUN, WALK, STRIKEOUT ...
     description: str # 중계 멘트
     runners_advanced: bool = False
+    
+    # LLM Decides Bases (Rule-Free)
+    # [1루주자이름/None, 2루주자이름/None, 3루주자이름/None]
+    # 이름 문자열로 받아서 engine에서 매핑
+    final_bases: List[Optional[str]] = Field(default_factory=lambda: [None, None, None])
     runs_scored: int = 0
+    
     # Detail Info
     pitch_desc: str = "" # 어떤 공을 던졌는지
     hit_desc: str = ""   # 어떻게 쳤는지
@@ -241,5 +249,6 @@ class BroadcastData(BaseModel):
     away_score: int
     current_batter: Dict[str, Any]
     current_pitcher: Dict[str, Any]
+    runners: List[Optional[Dict[str, Any]]] # [1루주자, 2루주자, 3루주자] 정보 (없으면 None)
     result: SimulationResult
     next_batter: Dict[str, Any] # [Feature] 다음 타자 정보 포함

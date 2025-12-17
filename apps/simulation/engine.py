@@ -1,5 +1,6 @@
 import os
 import random
+import json
 from typing import TypedDict, Annotated, List, Dict
 from dotenv import load_dotenv
 
@@ -22,7 +23,7 @@ from .dummy_generator import init_dummy_game
 load_dotenv()
 
 # --- LLM Setup ---
-llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
 
 # --- State for Graph ---
 class SimState(TypedDict):
@@ -119,10 +120,15 @@ BATTER_PROMPT = """
 
 RESOLVER_PROMPT = """
 당신은 야구 매치의 결과를 판정하는 심판이자 물리 엔진입니다.
-모든 변수(능력치, 날씨, 작전, 투수 의도, 타자 의도)를 종합해 타석 결과를 판정하세요.
+모든 변수(능력치, 날씨, 작전, 투수 의도, 타자 의도)와 **현재 주자 상황**을 종합해 타석 결과와 **최종 주자 위치**를 판정하세요.
 
 [환경]
 - 날씨: {weather}, 바람: {wind}, 심판 존: {zone}
+
+[현재 주자 상황]
+- 1루: {runner_1}
+- 2루: {runner_2}
+- 3루: {runner_3}
 
 [투수 {pitcher_name}]
 - 의도: {pitch_type} ({pitch_location})
@@ -137,15 +143,27 @@ RESOLVER_PROMPT = """
 - 수비측: {def_strategy}
 - 공격측: {off_strategy}
 
-[판정 로직]
-1. 투수의 제구력과 의도에 따라 실제 투구가 결정됩니다.
-2. 타자의 노림수가 적중하면 안타/장타 확률이 **대폭** 상승합니다.
-3. 빗맞으면 땅볼/플라이 확률이 높습니다.
-4. 날씨(비, 바람)가 수비 실책이나 타구 비거리에 영향을 줄 수 있습니다.
-5. 무승부는 없습니다.
+[판정 로직 (Rules-Free)]
+1. 투수와 타자의 대결 결과를 물리적으로 추론하세요.
+2. 결과에 따라 **주자들이 어디까지 진루했을지** 판단하세요.
+   - 예: "우중간 깊은 타구! 1루 주자는 발이 빠르니 3루까지 달립니다."
+   - 예: "내야 땅볼! 1루 주자는 2루에서 아웃, 타자는 1루 세이프."
+   - 예: "홈런! 모든 주자와 타자가 득점합니다."
+   - 예: "볼넷! 밀어내기 상황이거나 1루가 비어있으면 채웁니다."
+3. 득점도 직접 계산하세요.
 
-결과를 JSON으로 출력하세요. `result_code`는 (HIT_SINGLE, HIT_DOUBLE, HIT_TRIPLE, HOMERUN, WALK, STRIKEOUT, OUT_GROUND, OUT_FLY, OUT_LINE, ERROR) 중 하나여야 합니다.
-중계 멘트(`description`)는 아주 생생하게, 투수와 타자의 수싸움 결과를 묘사하세요.
+결과를 JSON으로 출력하세요.
+- `result_code`: (HIT_SINGLE, HIT_DOUBLE, HIT_TRIPLE, HOMERUN, WALK, STRIKEOUT, OUT_GROUND, OUT_FLY, OUT_LINE, ERROR, HIT_BY_PITCH)
+- `description`: 생생한 중계 멘트 (투수 vs 타자 및 주자 플레이 묘사)
+- `final_bases`: **[1루주자, 2루주자, 3루주자]** 리스트. (인덱스 주의)
+    - **Index 0 = 1루 (1st Base)**
+    - **Index 1 = 2루 (2nd Base)**
+    - **Index 2 = 3루 (3rd Base)**
+    - 예: 주자 없을 때 1루타 -> `["타자이름", null, null]` (0번 인덱스 채움)
+    - 예: 주자 없을 때 2루타 -> `[null, "타자이름", null]` (1번 인덱스 채움)
+    - 예: 1루 주자("A")가 있고 타자("B")가 안타 -> `["B", "A", null]` (B는 1루, A는 2루로 이동)
+    - **주의**: 주자는 서로 추월할 수 없습니다. 1루 주자가 3루에 가려면 2루 주자는 홈으로 들어와야(득점) 합니다.
+- `runs_scored`: 이 플레이로 들어온 득점 수 (점수 계산 필수)
 """
 
 # --- Nodes ---
@@ -284,10 +302,19 @@ def resolver_node(state: SimState):
     prompt = ChatPromptTemplate.from_template(RESOLVER_PROMPT)
     chain = prompt | llm.with_structured_output(SimulationResult)
     
+    runners = {
+        "runner_1": game.bases.basec1.character.name if game.bases.basec1 else "없음",
+        "runner_2": game.bases.basec2.character.name if game.bases.basec2 else "없음",
+        "runner_3": game.bases.basec3.character.name if game.bases.basec3 else "없음"
+    }
+
     res = chain.invoke({
         "weather": ctx.weather,
         "wind": ctx.wind_direction,
         "zone": ctx.umpire_zone,
+        "runner_1": runners["runner_1"],
+        "runner_2": runners["runner_2"],
+        "runner_3": runners["runner_3"],
         "pitcher_name": pitcher.character.name,
         "pitch_type": p_dec.pitch_type,
         "pitch_location": p_dec.location,
@@ -312,23 +339,100 @@ def update_state_node(state: SimState):
     game = state["game"]
     res = state["last_result"]
     code = res.result_code
-
-    # --- Score Logic (Simplified) ---
-    scored = 0
-    # 타점/득점 처리는 LLM이 준 runs_scored를 믿음
     
+    batter = game.get_current_batter()
+
+    # --- Score Logic based on LLM ---
+    # LLM이 runs_scored를 직접 계산해서 줌
+    runs_scored = res.runs_scored
+    
+    # 득점 반영
     if game.half == Half.TOP:
-        game.away_score += res.runs_scored
+        game.away_score += runs_scored
     else:
-        game.home_score += res.runs_scored
+        game.home_score += runs_scored
         
     if "OUT" in code or code == "STRIKEOUT":
         game.outs += 1
 
-    # Log
+    # --- Base Update (Mapping LLM names to Objects) ---
+    # LLM returns names: ["Kim", "Lee", None]
+    # We need to find player objects from current lineups or runners
+    
+    # 현재 필드에 있는 주자들 + 타자 후보군
+    potential_runners = [game.bases.basec1, game.bases.basec2, game.bases.basec3, batter]
+    potential_runners = [r for r in potential_runners if r is not None]
+    
+    # 이름으로 매핑 (동명이인 처리 안됨 - 일단 이름 유니크 가정)
+    player_map = {p.character.name: p for p in potential_runners}
+    
+    new_bases_objs = [None, None, None]
+    
+    for i, r_name in enumerate(res.final_bases):
+        if r_name and r_name in player_map:
+            new_bases_objs[i] = player_map[r_name]
+        elif r_name and r_name == batter.character.name: # 타자가 나갔을 경우
+            new_bases_objs[i] = batter
+            
+    game.bases.basec1 = new_bases_objs[0]
+    game.bases.basec2 = new_bases_objs[1]
+    game.bases.basec3 = new_bases_objs[2]
+
+    # Log (Console)
     log_entry = f"[{game.inning}회{'초' if game.half==Half.TOP else '말'}] {res.description}"
+    # 주자/점수 상황 추가 로깅
+    runners_log = []
+    if game.bases.basec1: runners_log.append("1루")
+    if game.bases.basec2: runners_log.append("2루")
+    if game.bases.basec3: runners_log.append("3루")
+    runners_str = ",".join(runners_log) if runners_log else "없음"
+    
+    log_entry += f" (주자: {runners_str}, 득점: {runs_scored})"
     game.logs.append(log_entry)
     
+    # --- Data Logging (File) ---
+    # 1. Text Log
+    with open("simulation_log.txt", "a", encoding="utf-8") as f:
+        f.write(log_entry + "\n")
+        f.write(f"   (P: {state['pitcher_decision'].pitch_type}/{state['pitcher_decision'].location}, B: {state['batter_decision'].style})\n")
+
+    # 2. JSON Data Log (Frontend Interface)
+    # create BroadcastData
+    pitcher = game.get_current_pitcher()
+    batter = game.get_current_batter()
+    next_batter_info = game.get_next_batter_info()
+    
+    # Runners Info for Broadcast
+    runners_data = [None, None, None]
+    if game.bases.basec1: runners_data[0] = {"name": game.bases.basec1.character.name}
+    if game.bases.basec2: runners_data[1] = {"name": game.bases.basec2.character.name}
+    if game.bases.basec3: runners_data[2] = {"name": game.bases.basec3.character.name}
+
+    broadcast_data = BroadcastData(
+        match_id=game.match_id,
+        inning=game.inning,
+        half="TOP" if game.half == Half.TOP else "BOTTOM",
+        outs=game.outs,
+        home_score=game.home_score,
+        away_score=game.away_score,
+        current_batter={
+            "name": batter.character.name,
+            "role": "BATTER",
+            "stats": batter.character.batter_stats
+        },
+        current_pitcher={
+            "name": pitcher.character.name,
+            "role": "PITCHER",
+            "stats": pitcher.character.pitcher_stats
+        },
+        runners=runners_data,
+        result=res,
+        next_batter=next_batter_info
+    )
+    
+    with open("broadcast_data.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(broadcast_data.model_dump(), ensure_ascii=False) + "\n")
+
     # Console Output (Broadcast)
     print(f"BROADCAST: {log_entry}")
     print(f"   -> Pitcher: {state['pitcher_decision'].pitch_type} ({state['pitcher_decision'].effort})")
@@ -405,6 +509,13 @@ app = workflow.compile()
 # --- Execution Entry ---
 def run_simulation():
     print("--- Multi-Agent Engine Start ---")
+    
+    # Clear Logs
+    with open("simulation_log.txt", "w", encoding="utf-8") as f:
+        f.write("=== Simulation Start ===\n")
+    with open("broadcast_data.jsonl", "w", encoding="utf-8") as f:
+        pass
+
     game = init_dummy_game()
     initial_state = {
         "game": game, 
