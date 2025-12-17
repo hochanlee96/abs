@@ -1,5 +1,16 @@
-fastapi[standard]==0.115.0
-sqlalchemy==2.0.36
-pymysql==1.1.1
-google-auth==2.36.0
+langchain
+langgraph
+langchain-openai
+pydantic
+python-dotenv
+faker
+sqlalchemy
+fastapi
+uvicorn
+pymysql
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
 requests
+python-multipart
+# Add any other missing dependencies from simulation if needed

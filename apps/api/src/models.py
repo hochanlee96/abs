@@ -3,30 +3,36 @@ from typing import List, Optional
 from datetime import datetime
 
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import BigInteger, String, DateTime, func, ForeignKey, Integer, Boolean, Enum
+from sqlalchemy import BigInteger, String, DateTime, func, ForeignKey, Integer, Boolean, Enum, JSON
 
 class Base(DeclarativeBase):
     pass
 
 class Role(str, PyEnum):
-    PITCHER = "PITCHER"
-    BATTER = "BATTER"
+    USER = "USER"
+    AI = "AI"
 
 class MatchStatus(str, PyEnum):
     SCHEDULED = "SCHEDULED"
     IN_PROGRESS = "IN_PROGRESS"
     FINISHED = "FINISHED"
+    CANCELED = "CANCELED"
 
 class InningHalf(str, PyEnum):
     TOP = "TOP"
     BOTTOM = "BOTTOM"
 
 class ResultCode(str, PyEnum):
-    OUT = "OUT"
-    HIT = "HIT"
-    HOMERUN = "HOMERUN"
     STRIKEOUT = "STRIKEOUT"
     WALK = "WALK"
+    SINGLE = "SINGLE"
+    DOUBLE = "DOUBLE"
+    TRIPLE = "TRIPLE"
+    HOMERUN = "HOMERUN"
+    OUT = "OUT"
+    # Added for completeness if needed
+    FLY_OUT = "FLY_OUT"
+    GROUND_OUT = "GROUND_OUT"
 
 class Account(Base):
     __tablename__ = "accounts"
@@ -109,6 +115,7 @@ class Match(Base):
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.SCHEDULED)
     home_score: Mapped[int] = mapped_column(Integer, default=0)
     away_score: Mapped[int] = mapped_column(Integer, default=0)
+    game_state: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     winner_team_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     loser_team_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
 

@@ -62,13 +62,53 @@ def get_character(db: Session, character_id: int) -> Optional[Character]:
 def get_characters_by_account(db: Session, account_id: int) -> List[Character]:
     return db.execute(select(Character).where(Character.owner_account_id == account_id)).scalars().all()
 
+def get_teams_by_world(db: Session, world_id: int) -> List[Team]:
+    return db.execute(select(Team).where(Team.world_id == world_id)).scalars().all()
+
+def get_matches_by_world(db: Session, world_id: int) -> List[Match]:
+    return db.execute(select(Match).where(Match.world_id == world_id)).scalars().all()
+
 def delete_character(db: Session, character_id: int) -> bool:
     char = get_character(db, character_id)
     if char:
-        db.delete(char)
-        db.commit()
+        # Cascade delete world if this character belongs to one
+        # Logic: If this is the user's main character, we assume they want to wipe the league instance.
+        if char.world_id:
+            delete_world(db, char.world_id)
+        else:
+            db.delete(char)
+            db.commit()
         return True
     return False
+
+def delete_world(db: Session, world_id: int):
+    # 1. Delete Matches
+    db.execute(select(Match).where(Match.world_id == world_id)).scalars().all()
+    # SQL Alchemy specific bulk delete or iterate
+    # For simplicity and relationship handling, proper queries:
+    
+    # Matches
+    db.query(Match).filter(Match.world_id == world_id).delete()
+    
+    # TeamPlayers (Need to find teams first or join)
+    # db.query(TeamPlayer).filter(TeamPlayer.team.has(world_id=world_id)) ...
+    # Easier to iterate teams
+    teams = get_teams(db, world_id)
+    for team in teams:
+        db.query(TeamPlayer).filter(TeamPlayer.team_id == team.team_id).delete()
+        
+    # Teams
+    db.query(Team).filter(Team.world_id == world_id).delete()
+    
+    # Characters (NPCs and the User Char itself if not already deleted)
+    # delete_character calls this, so char is still in DB session?
+    # We should delete all characters in this world.
+    db.query(Character).filter(Character.world_id == world_id).delete()
+    
+    # World
+    db.query(World).filter(World.world_id == world_id).delete()
+    
+    db.commit()
 
 # Match
 def create_match(db: Session, world_id: int, home_team_id: int, away_team_id: int) -> Match:
@@ -85,6 +125,12 @@ def create_match(db: Session, world_id: int, home_team_id: int, away_team_id: in
 
 def get_match(db: Session, match_id: int) -> Optional[Match]:
     return db.execute(select(Match).where(Match.match_id == match_id)).scalar_one_or_none()
+
+def get_next_scheduled_match(db: Session, world_id: Optional[int] = None) -> Optional[Match]:
+    query = select(Match).where(Match.status == MatchStatus.SCHEDULED)
+    if world_id:
+        query = query.where(Match.world_id == world_id)
+    return db.execute(query.limit(1)).scalar_one_or_none()
 
 def update_match_status(db: Session, match_id: int, status: MatchStatus) -> Optional[Match]:
     match = get_match(db, match_id)
