@@ -16,6 +16,76 @@ class SimulationStatus(str, Enum):
     PLAYING = "PLAYING"
     FINISHED = "FINISHED"
 
+# --- Advanced Enums (For Multi-Agent) ---
+
+class Weather(str, Enum):
+    SUNNY = "SUNNY" # 맑음
+    CLOUDY = "CLOUDY" # 흐림
+    RAINY = "RAINY" # 비
+    WINDY = "WINDY" # 바람
+
+class UmpireZone(str, Enum):
+    NORMAL = "NORMAL"   # 보통
+    WIDE = "WIDE"       # 넓음 (투수 유리)
+    NARROW = "NARROW"   # 좁음 (타자 유리)
+    ERRATIC = "ERRATIC" # 오락가락
+
+class PitchType(str, Enum):
+    FASTBALL = "FASTBALL" # 직구
+    SLIDER = "SLIDER"     # 슬라이더
+    CURVE = "CURVE"       # 커브
+    CHANGEUP = "CHANGEUP" # 체인지업
+    SPLITTER = "SPLITTER" # 스플리터
+
+class PitchLocation(str, Enum):
+    HIGH = "HIGH"
+    LOW = "LOW"
+    INSIDE = "INSIDE"
+    OUTSIDE = "OUTSIDE"
+    MIDDLE = "MIDDLE" # 실투 가능성
+
+class BattingStyle(str, Enum):
+    AGGRESSIVE = "AGGRESSIVE" # 적극 타격 (초구 공략 등)
+    CAUTIOUS = "CAUTIOUS"     # 신중 타격 (공을 많이 봄)
+    PULL = "PULL"             # 당겨치기
+    PUSH = "PUSH"             # 밀어치기
+
+class TeamStrategy(str, Enum):
+    NORMAL = "NORMAL"           # 정상
+    BUNT = "BUNT"               # 번트 시도
+    HIT_AND_RUN = "HIT_AND_RUN" # 히트 앤드 런
+    INFIELD_IN = "INFIELD_IN"   # 전진 수비
+    LONG_BALL = "LONG_BALL"     # 장타 노림 (큰거 한방)
+
+# --- Decision Models (Thinking Agents) ---
+
+class DirectorContext(BaseModel):
+    """경기 환경 및 총괄 관리"""
+    weather: Weather = Weather.SUNNY
+    wind_direction: str = "None" # 예: "Center to Home"
+    umpire_zone: UmpireZone = UmpireZone.NORMAL
+
+class ManagerDecision(BaseModel):
+    """감독의 작전 지시"""
+    offense_strategy: TeamStrategy = TeamStrategy.NORMAL # 공격 작전
+    defense_strategy: TeamStrategy = TeamStrategy.NORMAL # 수비 작전
+    description: str = Field(..., description="작전 지시 이유 (LLM 생각)")
+
+class PitcherDecision(BaseModel):
+    """투수의 투구 의도"""
+    pitch_type: PitchType
+    location: PitchLocation
+    effort: str = "Normal" # Normal, Full_Power, Finesse
+    description: str = Field(..., description="투구 선택 이유 (LLM 생각)")
+
+class BatterDecision(BaseModel):
+    """타자의 타격 의도"""
+    aim_pitch_type: Optional[PitchType] = None # 노리는 구종
+    aim_location: Optional[PitchLocation] = None # 노리는 코스
+    style: BattingStyle
+    description: str = Field(..., description="타격 전략 이유 (LLM 생각)")
+
+
 # --- Base Models (Mapped to DB Schema) ---
 
 class Character(BaseModel):
@@ -104,6 +174,9 @@ class GameState(BaseModel):
     status: SimulationStatus = SimulationStatus.READY
     logs: List[str] = []
 
+    # Multi-Agent Context
+    director: DirectorContext = Field(default_factory=DirectorContext)
+
     def get_current_pitcher(self) -> PlayerState:
         if self.half == Half.TOP:
             return self.home_team.get_pitcher() # 초 공격은 원정팀, 수비(투수)는 홈팀
@@ -115,6 +188,12 @@ class GameState(BaseModel):
             return self.away_team.get_batter(self.current_batter_index_away)
         else:
             return self.home_team.get_batter(self.current_batter_index_home)
+    
+    def get_offense_team(self) -> Team:
+        return self.away_team if self.half == Half.TOP else self.home_team
+        
+    def get_defense_team(self) -> Team:
+        return self.home_team if self.half == Half.TOP else self.away_team
 
     def next_batter(self):
         if self.half == Half.TOP:
@@ -148,6 +227,9 @@ class SimulationResult(BaseModel):
     description: str # 중계 멘트
     runners_advanced: bool = False
     runs_scored: int = 0
+    # Detail Info
+    pitch_desc: str = "" # 어떤 공을 던졌는지
+    hit_desc: str = ""   # 어떻게 쳤는지
 
 class BroadcastData(BaseModel):
     """프론트엔드로 전송될 최종 데이터 구조"""
@@ -161,4 +243,3 @@ class BroadcastData(BaseModel):
     current_pitcher: Dict[str, Any]
     result: SimulationResult
     next_batter: Dict[str, Any] # [Feature] 다음 타자 정보 포함
-
