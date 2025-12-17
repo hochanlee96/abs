@@ -10,13 +10,51 @@ def create_random_stats():
     return int(random.triangular(30, 100, 60))
 
 def create_dummy_character(role: Role) -> Character:
+    # 기본 스탯 (Triangle 분포)
+    base_stat = lambda: int(random.triangular(30, 100, 60))
+    # 서브 스탯 (균등 or 정규)
+    sub_stat = lambda: int(random.randint(30, 90))
+    
+    # 포지션 할당
+    pos_main = "RP" if role == Role.PITCHER else random.choice(["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"])
+    
     return Character(
         character_id=str(uuid4()),
         name=fake.name(),
         role=role,
-        contact=create_random_stats(),
-        power=create_random_stats(),
-        speed=create_random_stats()
+        contact=base_stat(),
+        power=base_stat(),
+        speed=base_stat(),
+        
+        # Extended Stats
+        mental=sub_stat(),
+        stamina=random.randint(60, 100) if role == Role.PITCHER else random.randint(40, 80),
+        recovery=sub_stat(),
+        velocity_max=int(random.triangular(130, 160, 144)),
+        
+        # Pitch Grades
+        pitch_fastball=sub_stat(),
+        pitch_slider=sub_stat(),
+        pitch_curve=sub_stat(),
+        pitch_changeup=sub_stat(),
+        pitch_splitter=sub_stat(),
+        
+        # Batter Details
+        eye=sub_stat(),
+        clutch=sub_stat(),
+        contact_left=base_stat(),
+        contact_right=base_stat(),
+        power_left=base_stat(),
+        power_right=base_stat(),
+        
+        # Defense
+        defense_range=sub_stat(),
+        defense_error=random.randint(10, 80), # 10(좋음) ~ 80(나쁨) - 해석 나름이나 여기선 수치가 높을수록 실책빈도가 높다는 의미로 가정? 아니면 능력치니까 높을수록 좋은걸로? models.py 설명엔 '포구 실책 빈도'라고 되어있음.
+        # models.py: defense_error: int = Field(50, description="포구 실책 빈도 (낮을수록 좋음)")
+        # 그렇다면 낮게 생성해야 좋음.
+        defense_arm=sub_stat(),
+        position_main=pos_main,
+        position_sub=None
     )
 
 def create_dummy_player(role: Role) -> PlayerState:
