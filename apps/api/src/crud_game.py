@@ -86,6 +86,9 @@ def create_match(db: Session, world_id: int, home_team_id: int, away_team_id: in
 def get_match(db: Session, match_id: int) -> Optional[Match]:
     return db.execute(select(Match).where(Match.match_id == match_id)).scalar_one_or_none()
 
+def get_next_scheduled_match(db: Session) -> Optional[Match]:
+    return db.execute(select(Match).where(Match.status == MatchStatus.SCHEDULED).limit(1)).scalar_one_or_none()
+
 def update_match_status(db: Session, match_id: int, status: MatchStatus) -> Optional[Match]:
     match = get_match(db, match_id)
     if match:

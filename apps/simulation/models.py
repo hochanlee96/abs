@@ -223,9 +223,20 @@ class GameState(BaseModel):
 
 # --- IO / Broadcast Models ---
 
+class ResultCode(str, Enum):
+    SO = "SO"
+    BB = "BB"
+    HBP = "HBP"
+    FO = "FO"
+    GO = "GO"
+    SINGLE = "1B"
+    DOUBLE = "2B"
+    TRIPLE = "3B"
+    HR = "HR"
+
 class SimulationResult(BaseModel):
     """LLM이 생성한 타석 결과"""
-    result_code: str # HIT, OUT, HOMERUN, WALK, STRIKEOUT ...
+    result_code: ResultCode # Enum enforced
     description: str # 중계 멘트
     runners_advanced: bool = False
     

@@ -11,17 +11,20 @@ services:
     volumes:
       - ./initdb:/docker-entrypoint-initdb.d
     healthcheck:
-      test: [ "CMD", "mariadb-admin", "ping", "-h", "localhost" ]
+      test: [ "CMD-SHELL", "mariadb-admin ping -h localhost -p${MARIADB_ROOT_PASSWORD}" ]
       interval: 5s
       timeout: 3s
       retries: 30
 
   api:
     build: ../apps/api
+    env_file:
+      - .env
     environment:
       DATABASE_URL: "mysql+pymysql://app:app@mariadb:3306/baseball"
-      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-placeholder_client_id}"
       DEV_MODE: "true"
+      # OPENAI_API_KEY and GOOGLE keys will be loaded from .env automatically
+      # But explicit defaults or overrides can remain if needed
     ports:
       - "8000:8000"
     depends_on:
@@ -29,14 +32,14 @@ services:
         condition: service_healthy
     volumes:
       - ../apps/api:/app
+      - ../apps/simulation:/app/simulation_module
 
   web:
     build: ../apps/web
+    env_file:
+      - .env
     environment:
       NEXTAUTH_URL: "http://localhost:3000"
-      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET:-placeholder_secret}"
-      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-placeholder_client_id}"
-      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-placeholder_client_secret}"
       NEXT_PUBLIC_API_BASE_URL: "http://localhost:8000"
     ports:
       - "3000:3000"

@@ -144,7 +144,7 @@ CREATE TABLE matches (
   home_team_id BIGINT UNSIGNED NOT NULL,
   away_team_id BIGINT UNSIGNED NOT NULL,
 
-  status ENUM('SCHEDULED','IN_PROGRESS','FINAL','CANCELED') NOT NULL DEFAULT 'SCHEDULED',
+  status ENUM('SCHEDULED','IN_PROGRESS','FINISHED','CANCELED') NOT NULL DEFAULT 'SCHEDULED',
 
   scheduled_at DATETIME(3) NULL,
   started_at DATETIME(3) NULL,
@@ -152,6 +152,9 @@ CREATE TABLE matches (
 
   home_score INT NOT NULL DEFAULT 0,
   away_score INT NOT NULL DEFAULT 0,
+  
+  -- Current state for simulation (transient)
+  game_state JSON NULL,
 
   -- 무승부 없음: 점수로 winner/loser 파생 (앱 레벨에서 update)
   winner_team_id BIGINT UNSIGNED NULL,
@@ -165,6 +168,8 @@ CREATE TABLE matches (
   KEY idx_matches_home (home_team_id),
   KEY idx_matches_away (away_team_id),
   KEY idx_matches_winner (winner_team_id),
+
+
 
   CONSTRAINT fk_matches_world
     FOREIGN KEY (world_id) REFERENCES worlds(world_id)
