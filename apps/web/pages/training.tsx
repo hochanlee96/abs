@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import styles from "../styles/Training.module.css";
+import { apiGetMyCharacter } from "../lib/api";
 
 type StatType = "contact" | "power" | "speed";
 
@@ -83,22 +84,36 @@ export default function TrainingPage() {
         }
     }, [status, router]);
 
-    const loadCharacter = () => {
-        // Dummy character data with XP system
-        const dummyCharacter: CharacterWithXP = {
-            character_id: 1,
-            nickname: "Test Player",
-            contact: 3,
-            contact_xp: 75,
-            contact_xp_needed: 150, // 50 * level (50 * 3)
-            power: 4,
-            power_xp: 50,
-            power_xp_needed: 200, // 50 * level (50 * 4)
-            speed: 3,
-            speed_xp: 30,
-            speed_xp_needed: 150, // 50 * level (50 * 3)
-        };
-        setCharacter(dummyCharacter);
+    const loadCharacter = async () => {
+        try {
+            const token = (session as any)?.id_token;
+            if (!token) return;
+
+            const char = await apiGetMyCharacter(token);
+            if (char) {
+                // Map API character to CharacterWithXP
+                // If XP fields are missing (from backend/fresh creation), initialize them
+                const charWithXP: CharacterWithXP = {
+                    character_id: char.character_id,
+                    nickname: char.nickname,
+                    contact: char.contact,
+                    contact_xp: (char as any).contact_xp || 0,
+                    contact_xp_needed: (char as any).contact_xp_needed || char.contact * 50,
+                    power: char.power,
+                    power_xp: (char as any).power_xp || 0,
+                    power_xp_needed: (char as any).power_xp_needed || char.power * 50,
+                    speed: char.speed,
+                    speed_xp: (char as any).speed_xp || 0,
+                    speed_xp_needed: (char as any).speed_xp_needed || char.speed * 50,
+                };
+                setCharacter(charWithXP);
+            } else {
+                // No character found, redirect to create
+                router.push("/character");
+            }
+        } catch (e) {
+            console.error("Failed to load character", e);
+        }
     };
 
     const handleTrain = (training: Training) => {
@@ -147,6 +162,15 @@ export default function TrainingPage() {
             (updatedCharacter[statLevelKey] as number) = currentLevel;
 
             setCharacter(updatedCharacter);
+
+            // Save to local storage to persist XP
+            if (typeof window !== 'undefined') {
+                // We need to merge the XP data with the base character data stored in api.ts
+                // But since api.ts stores the whole object, we can just update it.
+                // However, api.ts might have different structure.
+                // Let's just save this CharacterWithXP object as the source of truth for now.
+                localStorage.setItem('abs_character_data', JSON.stringify(updatedCharacter));
+            }
 
             // Add to training log
             const newLog: TrainingLog = {

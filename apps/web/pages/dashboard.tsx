@@ -42,15 +42,20 @@ export default function Dashboard() {
         </div>
 
         <div className={styles.card}>
-          <h2>🏆 Leaderboard</h2>
-          <p>See top players</p>
-          <button className={styles.button}>Coming Soon</button>
+          <h2>🏋️ Training</h2>
+          <p>Improve your stats</p>
+          <button
+            className={styles.button}
+            onClick={() => router.push("/training")}
+          >
+            Start Training
+          </button>
         </div>
 
         <div className={styles.card}>
           <h2>⚙️ Character</h2>
           <p>Manage your character</p>
-          <button 
+          <button
             className={styles.button}
             onClick={() => router.push("/character")}
           >
