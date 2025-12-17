@@ -103,13 +103,20 @@ export async function apiGetMyCharacter(idToken: string): Promise<Character | nu
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(chars[0]));
         }
         return chars[0];
+      } else {
+        // Backend says no characters. Trust it.
+        // Clear local storage to remove stale data.
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(LOCAL_STORAGE_KEY);
+        }
+        return null;
       }
     }
   } catch (e) {
     console.warn("Backend fetch failed, checking local storage", e);
   }
 
-  // Fallback to local storage
+  // Fallback to local storage ONLY if backend fetch failed (network error)
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (stored) {
@@ -120,7 +127,7 @@ export async function apiGetMyCharacter(idToken: string): Promise<Character | nu
 }
 
 export async function apiDeleteCharacter(idToken: string): Promise<void> {
-  // Clear local storage
+  // Always clear local storage first
   if (typeof window !== 'undefined') {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
   }

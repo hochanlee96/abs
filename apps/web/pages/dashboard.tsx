@@ -62,28 +62,8 @@ export default function Dashboard() {
       setPlayingMatchId(res.match_id);
       setLogs(prev => [...prev, `Simulation Started for Match #${res.match_id}`]);
 
-      // Start Polling
-      stopPolling();
-      pollingRef.current = setInterval(async () => {
-        try {
-          const match = await apiGetMatch(idToken, res.match_id);
-          // Show Logs
-          if (match.game_state && match.game_state.logs) {
-            // For simplicity, just show last few logs or all
-            // Replacing logs with simulation logs
-            const simLogs = match.game_state.logs;
-            setLogs(simLogs.length > 20 ? simLogs.slice(-20) : simLogs);
-          }
-
-          if (match.status === "FINISHED") {
-            setLogs(prev => [...prev, `Match Finished! Winner: Team ${match.winner_team_id}`]);
-            stopPolling();
-            setPlayingMatchId(null);
-          }
-        } catch (po) {
-          console.error("Polling error", po);
-        }
-      }, 1000);
+      // Redirect to Live Match Page
+      router.push(`/match/live?matchId=${res.match_id}`);
 
     } catch (e) {
       console.error(e);

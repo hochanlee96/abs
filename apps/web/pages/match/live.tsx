@@ -3,6 +3,7 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import styles from "../../styles/LiveMatch.module.css";
 import { MatchEventType, BroadcastData, MatchEventMessage, SimulationResult, PlayerInfo } from "../../types/match";
+import { apiGetMatch } from "../../lib/api";
 
 import BaseballField from "../../components/BaseballField";
 import PlayerCard from "../../components/PlayerCard";
@@ -29,105 +30,64 @@ export default function LiveMatchPage() {
 
 
 
-    // Auto-connect removed to allow manual start via button
-    // useEffect(() => {
-    //   if (status === "authenticated" && idToken && matchId && !wsRef.current) {
-    //     connectWs();
-    //   }
-    //   return () => {
-    //     if (wsRef.current) {
-    //       wsRef.current.close();
-    //       wsRef.current = null;
-    //     }
-    //   };
-    // }, [status, idToken, matchId]);
-
-    // Cleanup on unmount only
+    // Polling for Match Data
     useEffect(() => {
-        return () => {
-            if (wsRef.current) {
-                wsRef.current.close();
-                wsRef.current = null;
-            }
-        };
-    }, []);
+        if (status !== "authenticated" || !idToken || !matchId) return;
 
-    const connectWs = () => {
-        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
-        // Use the new replay endpoint
-        const wsUrl = apiBase.replace("http", "ws") + `/ws/simulation/replay/${matchId}?token=${idToken}`;
-
-        console.log("Connecting to WS:", wsUrl);
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-            console.log("WS Connected");
-        };
-
-        ws.onmessage = (event) => {
+        const interval = setInterval(async () => {
             try {
-                const msg: MatchEventMessage = JSON.parse(event.data);
-                console.log("WS Message:", msg);
+                const match = await apiGetMatch(idToken, Number(matchId));
 
-                switch (msg.type) {
-                    case "CONNECTED":
-                        setGameState("READY");
-                        break;
-                    case "ROSTERS":
-                        if (msg.home) setHomeLineup(msg.home);
-                        if (msg.away) setAwayLineup(msg.away);
-                        break;
-                    case "PA":
-                        if (msg.data) {
-                            setLogs((prev) => [msg.data!, ...prev]);
-                            setScore({ home: msg.data.home_score, away: msg.data.away_score });
+                if (match.status === "FINISHED") {
+                    setGameState("FINISHED");
+                } else if (match.status === "IN_PROGRESS") {
+                    setGameState("PLAYING");
+                } else {
+                    setGameState("READY");
+                }
 
-                            // Update inning scores
-                            setInningScores(prev => {
-                                const newScores = {
-                                    home: { ...prev.home },
-                                    away: { ...prev.away }
-                                };
-                                const d = msg.data!;
-                                const team = d.half === "TOP" ? "away" : "home";
-                                if (!newScores[team][d.inning]) newScores[team][d.inning] = 0;
-                                newScores[team][d.inning] += d.result.runs_scored;
-                                return newScores;
-                            });
-                        }
-                        break;
-                    case "FINAL":
-                        setGameState("FINISHED");
-                        if (msg.scores) {
-                            setScore(msg.scores);
-                        }
-                        break;
-                    case "ERROR":
-                        alert("Error: " + msg.message);
-                        break;
+                if (match.game_state && match.game_state.logs) {
+                    const simLogs: BroadcastData[] = match.game_state.logs;
+                    // Reverse logs to show newest first if that's how we want to store them in state
+                    // But the API likely returns them in chronological order.
+                    // The component expects `logs[0]` to be the LATEST event for the field view.
+                    // So we should reverse them for display/state.
+                    const reversedLogs = [...simLogs].reverse();
+                    setLogs(reversedLogs);
+
+                    if (reversedLogs.length > 0) {
+                        const latest = reversedLogs[0];
+                        setScore({ home: latest.home_score, away: latest.away_score });
+
+                        // Update Inning Scores (simplified reconstruction)
+                        const newInningScores = { home: {} as Record<number, number>, away: {} as Record<number, number> };
+                        // We would need to iterate all logs to build this accurately, 
+                        // or backend provides it. For now, let's just use the latest score 
+                        // and maybe try to infer. 
+                        // Better approach: Iterate all logs chronologically
+                        simLogs.forEach(log => {
+                            const team = log.half === "TOP" ? "away" : "home";
+                            if (!newInningScores[team][log.inning]) newInningScores[team][log.inning] = 0;
+                            newInningScores[team][log.inning] += log.result.runs_scored;
+                        });
+                        setInningScores(newInningScores);
+                    }
                 }
             } catch (e) {
-                console.error("Failed to parse WS message", e);
+                console.error("Polling error", e);
             }
-        };
+        }, 1000);
 
-        ws.onclose = () => {
-            console.log("WS Closed");
-        };
-    };
+        return () => clearInterval(interval);
+    }, [status, idToken, matchId]);
 
+    // Removed manual start/connect since it's auto-polling now
     const handleStart = () => {
-        // For replay, connecting IS starting
-        if (!wsRef.current) {
-            connectWs();
-        }
+        // Optional: Trigger backend to ensure it's running if needed
     };
 
-    // Removed client-side mock simulation in favor of backend replay
     const handleReplaySimulation = () => {
-        connectWs();
+        // No-op or reset
     };
 
     const getResultClass = (code: string) => {
@@ -189,7 +149,7 @@ export default function LiveMatchPage() {
                                     </td>
                                 ))}
                                 <td style={{ padding: '4px', fontWeight: 'bold', color: '#fbbf24' }}>{score.away}</td>
-                                <td style={{ padding: '4px' }}>{logs.filter(l => l.half === 'TOP' && ['HIT_SINGLE', 'HIT_DOUBLE', 'HIT_TRIPLE', 'HOMERUN'].includes(l.result.result_code)).length}</td>
+                                <td style={{ padding: '4px' }}>{logs.filter(l => l.half === 'TOP' && ['1B', '2B', '3B', 'HR'].includes(l.result.result_code)).length}</td>
                             </tr>
                             <tr>
                                 <td style={{ padding: '4px', textAlign: 'left', fontWeight: 'bold' }}>HOME</td>
@@ -199,7 +159,7 @@ export default function LiveMatchPage() {
                                     </td>
                                 ))}
                                 <td style={{ padding: '4px', fontWeight: 'bold', color: '#fbbf24' }}>{score.home}</td>
-                                <td style={{ padding: '4px' }}>{logs.filter(l => l.half === 'BOTTOM' && ['HIT_SINGLE', 'HIT_DOUBLE', 'HIT_TRIPLE', 'HOMERUN'].includes(l.result.result_code)).length}</td>
+                                <td style={{ padding: '4px' }}>{logs.filter(l => l.half === 'BOTTOM' && ['1B', '2B', '3B', 'HR'].includes(l.result.result_code)).length}</td>
                             </tr>
                         </tbody>
                     </table>

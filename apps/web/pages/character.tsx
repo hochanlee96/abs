@@ -10,17 +10,17 @@ type StatType = "contact" | "power" | "speed";
 export default function CharacterPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  
+
   const [loading, setLoading] = useState(true);
   const [character, setCharacter] = useState<Character | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  
+
   // Creation Form State
   const [nickname, setNickname] = useState("");
   const [stats, setStats] = useState({ contact: 0, power: 0, speed: 0 });
   const MAX_POINTS = 10;
-  
+
   const totalPointsUsed = stats.contact + stats.power + stats.speed;
   const pointsRemaining = MAX_POINTS - totalPointsUsed;
 
@@ -50,21 +50,21 @@ export default function CharacterPage() {
     setStats(prev => {
       const current = prev[type];
       const next = current + delta;
-      
+
       // Validation: cannot go below 0
       if (next < 0) return prev;
-      
+
       // Validation: cannot exceed total points constraint
       // But we can decrease even if max points used
       if (delta > 0 && totalPointsUsed >= MAX_POINTS) return prev;
-      
+
       return { ...prev, [type]: next };
     });
   };
 
   const handleCreate = async () => {
     if (!nickname.trim() || totalPointsUsed !== MAX_POINTS) return; // Enforce strict 10 points usage? Or just update validation visual
-    
+
     try {
       setLoading(true);
       const idToken = (session as any)?.id_token;
@@ -72,11 +72,11 @@ export default function CharacterPage() {
         nickname,
         ...stats
       });
-      
+
       // Auto-initialize League
       console.log("Auto-initializing league...");
-      await apiInitLeague(idToken, newChar.character_id, `League for ${newChar.nickname}`);
-      
+      await apiInitLeague(idToken, newChar.character_id, `League for ${newChar.nickname} ${Date.now()}`);
+
       setCharacter(newChar);
       setIsCreating(false);
     } catch (e: any) {
@@ -113,170 +113,170 @@ export default function CharacterPage() {
 
   return (
     <>
-    <div className={styles.container}>
-      {character ? (
-        // Existing Character Viewer
-        <div className={styles.card}>
-          <div className={styles.characterDisplay}>
-            <h2 style={{ marginBottom: 10, color: 'var(--secondary)' }}>Your Character</h2>
-            <h1 className={styles.charNickname}>{character.nickname}</h1>
-            
+      <div className={styles.container}>
+        {character ? (
+          // Existing Character Viewer
+          <div className={styles.card}>
+            <div className={styles.characterDisplay}>
+              <h2 style={{ marginBottom: 10, color: 'var(--secondary)' }}>Your Character</h2>
+              <h1 className={styles.charNickname}>{character.nickname}</h1>
+
+              <div className={styles.statsGrid}>
+                <div className={styles.statDisplay}>
+                  <span>Contact</span>
+                  <strong>{character.contact}</strong>
+                </div>
+                <div className={styles.statDisplay}>
+                  <span>Power</span>
+                  <strong>{character.power}</strong>
+                </div>
+                <div className={styles.statDisplay}>
+                  <span>Speed</span>
+                  <strong>{character.speed}</strong>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 20, color: 'var(--secondary)', fontSize: '0.9rem' }}>
+                Created: {new Date(character.created_at).toLocaleDateString()}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                <button
+                  className={styles.startButton}
+                  onClick={() => router.push('/dashboard')}
+                  style={{
+                    flex: 1,
+                    padding: '12px 24px',
+                    backgroundColor: 'var(--primary)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Go to Dashboard
+                </button>
+                <button
+                  className={styles.deleteButton}
+                  onClick={() => setShowDeleteModal(true)}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    borderRadius: 8
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+
+            </div>
+          </div>
+        ) : isCreating ? (
+          // Creation Form
+          <div className={styles.card}>
+            <h2 style={{ marginBottom: '1rem' }}>Create New Character</h2>
+
+            <div className={styles.inputGroup}>
+              <label className={styles.label}>Nickname</label>
+              <input
+                className={styles.input}
+                value={nickname}
+                onChange={e => setNickname(e.target.value)}
+                placeholder="Enter nickname..."
+              />
+            </div>
+
             <div className={styles.statsGrid}>
-              <div className={styles.statDisplay}>
-                <span>Contact</span>
-                <strong>{character.contact}</strong>
+              <div className={styles.statRow}>
+                <span className={styles.statName}>Contact</span>
+                <div className={styles.statControl}>
+                  <button
+                    className={styles.statButton}
+                    onClick={() => updateStat("contact", -1)}
+                    disabled={stats.contact <= 0}
+                  >-</button>
+                  <span className={styles.statValue}>{stats.contact}</span>
+                  <button
+                    className={styles.statButton}
+                    onClick={() => updateStat("contact", 1)}
+                    disabled={pointsRemaining <= 0}
+                  >+</button>
+                </div>
               </div>
-              <div className={styles.statDisplay}>
-                <span>Power</span>
-                <strong>{character.power}</strong>
+
+              <div className={styles.statRow}>
+                <span className={styles.statName}>Power</span>
+                <div className={styles.statControl}>
+                  <button
+                    className={styles.statButton}
+                    onClick={() => updateStat("power", -1)}
+                    disabled={stats.power <= 0}
+                  >-</button>
+                  <span className={styles.statValue}>{stats.power}</span>
+                  <button
+                    className={styles.statButton}
+                    onClick={() => updateStat("power", 1)}
+                    disabled={pointsRemaining <= 0}
+                  >+</button>
+                </div>
               </div>
-              <div className={styles.statDisplay}>
-                <span>Speed</span>
-                <strong>{character.speed}</strong>
+
+              <div className={styles.statRow}>
+                <span className={styles.statName}>Speed</span>
+                <div className={styles.statControl}>
+                  <button
+                    className={styles.statButton}
+                    onClick={() => updateStat("speed", -1)}
+                    disabled={stats.speed <= 0}
+                  >-</button>
+                  <span className={styles.statValue}>{stats.speed}</span>
+                  <button
+                    className={styles.statButton}
+                    onClick={() => updateStat("speed", 1)}
+                    disabled={pointsRemaining <= 0}
+                  >+</button>
+                </div>
               </div>
-            </div>
-            
-            <div style={{ marginTop: 20, color: 'var(--secondary)', fontSize: '0.9rem' }}>
-              Created: {new Date(character.created_at).toLocaleDateString()}
             </div>
 
-            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              <button 
-                className={styles.startButton}
-                onClick={() => router.push('/dashboard')}
-                style={{ 
-                  flex: 1,
-                  padding: '12px 24px', 
-                  backgroundColor: 'var(--primary)', 
-                  color: 'white', 
-                  border: 'none',
-                  borderRadius: 8,
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Go to Dashboard
-              </button>
-              <button 
-                className={styles.deleteButton}
-                onClick={() => setShowDeleteModal(true)}
-                style={{ 
-                  padding: '12px 24px', 
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)', 
-                  color: '#ef4444', 
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                  borderRadius: 8
-                }}
-              >
-                Delete
-              </button>
+            <div className={styles.pointsRemaining}>
+              Points Remaining: {pointsRemaining}
             </div>
 
+            <button
+              className={styles.submitButton}
+              onClick={handleCreate}
+              disabled={!nickname || pointsRemaining !== 0}
+            >
+              캐릭터 생성하기
+            </button>
           </div>
-        </div>
-      ) : isCreating ? (
-        // Creation Form
-        <div className={styles.card}>
-          <h2 style={{ marginBottom: '1rem' }}>Create New Character</h2>
-          
-          <div className={styles.inputGroup}>
-            <label className={styles.label}>Nickname</label>
-            <input 
-              className={styles.input}
-              value={nickname}
-              onChange={e => setNickname(e.target.value)}
-              placeholder="Enter nickname..."
-            />
-          </div>
-          
-          <div className={styles.statsGrid}>
-            <div className={styles.statRow}>
-              <span className={styles.statName}>Contact</span>
-              <div className={styles.statControl}>
-                <button 
-                  className={styles.statButton} 
-                  onClick={() => updateStat("contact", -1)}
-                  disabled={stats.contact <= 0}
-                >-</button>
-                <span className={styles.statValue}>{stats.contact}</span>
-                <button 
-                  className={styles.statButton} 
-                  onClick={() => updateStat("contact", 1)}
-                  disabled={pointsRemaining <= 0}
-                >+</button>
-              </div>
+        ) : (
+          // Empty State
+          <div className={`${styles.card} ${styles.emptyCard}`}>
+            <h2>No Character Found</h2>
+            <p style={{ color: 'var(--secondary)', marginBottom: '1rem' }}>
+              You haven't created a character yet.
+            </p>
+            <div style={{
+              width: 100, height: 100, background: 'rgba(255,255,255,0.05)',
+              borderRadius: '50%', margin: '0 auto', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', fontSize: '2rem',
+              color: 'var(--secondary)', border: '2px dashed var(--secondary)'
+            }}>
+              ?
             </div>
-            
-            <div className={styles.statRow}>
-              <span className={styles.statName}>Power</span>
-              <div className={styles.statControl}>
-                <button 
-                  className={styles.statButton} 
-                  onClick={() => updateStat("power", -1)}
-                  disabled={stats.power <= 0}
-                >-</button>
-                <span className={styles.statValue}>{stats.power}</span>
-                <button 
-                  className={styles.statButton} 
-                  onClick={() => updateStat("power", 1)}
-                  disabled={pointsRemaining <= 0}
-                >+</button>
-              </div>
-            </div>
-            
-            <div className={styles.statRow}>
-              <span className={styles.statName}>Speed</span>
-              <div className={styles.statControl}>
-                <button 
-                  className={styles.statButton} 
-                  onClick={() => updateStat("speed", -1)}
-                  disabled={stats.speed <= 0}
-                >-</button>
-                <span className={styles.statValue}>{stats.speed}</span>
-                <button 
-                  className={styles.statButton} 
-                  onClick={() => updateStat("speed", 1)}
-                  disabled={pointsRemaining <= 0}
-                >+</button>
-              </div>
-            </div>
+            <button className={styles.createButton} onClick={() => setIsCreating(true)}>
+              + 캐릭터 생성
+            </button>
           </div>
-          
-          <div className={styles.pointsRemaining}>
-            Points Remaining: {pointsRemaining}
-          </div>
-          
-          <button 
-            className={styles.submitButton}
-            onClick={handleCreate}
-            disabled={!nickname || pointsRemaining !== 0}
-          >
-            캐릭터 생성하기
-          </button>
-        </div>
-      ) : (
-        // Empty State
-        <div className={`${styles.card} ${styles.emptyCard}`}>
-          <h2>No Character Found</h2>
-          <p style={{ color: 'var(--secondary)', marginBottom: '1rem' }}>
-            You haven't created a character yet.
-          </p>
-          <div style={{ 
-            width: 100, height: 100, background: 'rgba(255,255,255,0.05)', 
-            borderRadius: '50%', margin: '0 auto', display: 'flex', 
-            alignItems: 'center', justifyContent: 'center', fontSize: '2rem',
-            color: 'var(--secondary)', border: '2px dashed var(--secondary)'
-          }}>
-            ?
-          </div>
-          <button className={styles.createButton} onClick={() => setIsCreating(true)}>
-            + 캐릭터 생성
-          </button>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
 
       <Modal
         isOpen={showDeleteModal}
@@ -284,7 +284,7 @@ export default function CharacterPage() {
         title="Delete Character?"
         footer={
           <>
-            <button 
+            <button
               className={styles.cancelButton}
               onClick={() => setShowDeleteModal(false)}
               style={{
@@ -298,7 +298,7 @@ export default function CharacterPage() {
             >
               Cancel
             </button>
-            <button 
+            <button
               className={styles.confirmButton}
               onClick={handleDelete}
               style={{
