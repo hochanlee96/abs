@@ -104,35 +104,103 @@ def run_match_background(match_id: int, db: Session):
         status=sim_models.SimulationStatus.PLAYING
     )
 
+    # Track previous state to infer results
+    previous_state = {
+        "home_score": 0,
+        "away_score": 0,
+        "outs": 0
+    }
+    logs_history = []
+
     # 3. Define Callback to Save Progress
     def on_step(updated_game: sim_models.GameState):
         logger.info(f"Stepped: {updated_game.inning} {updated_game.half} - Outs: {updated_game.outs}")
         
-        # A. Save Transient Game State (JSON)
-        # We need to serialize Pydantic model to dict
-        # Using model_dump (v2) or dict (v1). Requirements says pydantic used.
-        state_dump = updated_game.model_dump(mode='json')
-        match.game_state = state_dump
+        # Infer what happened
+        runs_scored = (updated_game.home_score - previous_state["home_score"]) + \
+                      (updated_game.away_score - previous_state["away_score"])
+        
+        # Update previous state
+        previous_state["home_score"] = updated_game.home_score
+        previous_state["away_score"] = updated_game.away_score
+        previous_state["outs"] = updated_game.outs
+
+        # Construct SimulationResult (Inferred)
+        last_log_text = updated_game.logs[-1] if updated_game.logs else "Play happened."
+        
+        # Parse result code from log text
+        # Mock engine produces: "hits a HOMERUN", "is OUT", "hits a 1B", etc.
+        # Real engine produces Korean: "1루에 세이프", "아웃", "홈런", etc.
+        result_code = "GO" # Default to ground out
+        
+        text = last_log_text
+        if "HOMERUN" in text or "홈런" in text:
+            result_code = "HR"
+        elif "Strikeout" in text or "삼진" in text:
+            result_code = "SO"
+        elif "OUT" in text or "아웃" in text or "잡아냅니다" in text:
+            result_code = "OUT"
+        elif "1B" in text or "1루에 세이프" in text or "안타" in text:
+            result_code = "1B"
+        elif "2B" in text or "2루에 세이프" in text or "2루타" in text:
+            result_code = "2B"
+        elif "3B" in text or "3루에 세이프" in text or "3루타" in text:
+            result_code = "3B"
+        elif "BB" in text or "볼넷" in text or "4구" in text:
+            result_code = "BB"
+        
+        # Debug logging for bases
+        logger.info(f"Bases: {updated_game.bases}")
+
+        sim_result = {
+            "reasoning": "Inferred from state change",
+            "result_code": result_code,
+            "description": last_log_text,
+            "runners_advanced": False,
+            "final_bases": [None, None, None],
+            "runs_scored": runs_scored,
+            "pitch_desc": "",
+            "hit_desc": ""
+        }
+
+        # Construct BroadcastData
+        # Need to map PlayerState to dict
+        def p_to_d(p):
+            if not p: return {"name": "None", "role": "BATTER", "stats": {}}
+            return {
+                "name": p.character.name,
+                "role": p.character.role,
+                "stats": p.character.batter_stats if p.character.role == "BATTER" else p.character.pitcher_stats
+            }
+
+        # Runners
+        runners = [
+            p_to_d(updated_game.bases.basec1) if updated_game.bases.basec1 else None,
+            p_to_d(updated_game.bases.basec2) if updated_game.bases.basec2 else None,
+            p_to_d(updated_game.bases.basec3) if updated_game.bases.basec3 else None
+        ]
+
+        broadcast_data = {
+            "match_id": str(match_id),
+            "inning": updated_game.inning,
+            "half": updated_game.half,
+            "outs": updated_game.outs,
+            "home_score": updated_game.home_score,
+            "away_score": updated_game.away_score,
+            "current_batter": p_to_d(updated_game.get_current_batter()),
+            "current_pitcher": p_to_d(updated_game.get_current_pitcher()),
+            "runners": runners,
+            "result": sim_result,
+            "next_batter": updated_game.get_next_batter_info()
+        }
+        
+        logs_history.append(broadcast_data)
+
+        # Save to DB
+        # We wrap it in a dict as expected by frontend: match.game_state.logs
+        match.game_state = { "logs": logs_history }
         match.home_score = updated_game.home_score
         match.away_score = updated_game.away_score
-        
-        # B. Save Plate Log (if a result occurred)
-        # The engine appends logs. We can check the last log or use the structured last_result if passed?
-        # The callback only gets updated_game. 
-        # But 'updated_game.logs' has strings. 
-        # Better approach: The engine state has 'last_result'.
-        # But our callback signature in engine.py only passes `updated_game`.
-        # *Self-Correction*: `on_step` in `engine.py` is called with `updated_game`.
-        # Accessing the structured result might require modifying engine to pass it, 
-        # OR we infer it from the fact that a step happened.
-        # Ideally, we want to save the `PlateAppearance` row here.
-        
-        # Let's assume for now we just save the game_state JSON which is enough for the frontend "progress".
-        # Saving PlateAppearance requires the `SimulationResult` object which dictates `result_code`.
-        # Engine refactor in previous step:
-        # `if on_step_callback: on_step_callback(updated_game)`
-        # It doesn't pass the result.
-        # I should probably update the DB regardless.
         
         db.commit()
     

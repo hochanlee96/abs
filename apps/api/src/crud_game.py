@@ -60,7 +60,7 @@ def get_character(db: Session, character_id: int) -> Optional[Character]:
     return db.execute(select(Character).where(Character.character_id == character_id)).scalar_one_or_none()
 
 def get_characters_by_account(db: Session, account_id: int) -> List[Character]:
-    return db.execute(select(Character).where(Character.owner_account_id == account_id)).scalars().all()
+    return db.execute(select(Character).where(Character.owner_account_id == account_id).order_by(Character.character_id.desc())).scalars().all()
 
 def get_teams_by_world(db: Session, world_id: int) -> List[Team]:
     return db.execute(select(Team).where(Team.world_id == world_id)).scalars().all()

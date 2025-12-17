@@ -356,7 +356,7 @@ def update_state_node(state: SimState):
     else:
         game.home_score += runs_scored
         
-    if "OUT" in code or code == "STRIKEOUT":
+    if code in [ResultCode.SO, ResultCode.FO, ResultCode.GO]:
         game.outs += 1
 
     # --- Base Update (Mapping LLM names to Objects) ---
