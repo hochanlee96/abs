@@ -18,7 +18,16 @@ export default function LiveMatchPage() {
     const [gameState, setGameState] = useState<"CONNECTING" | "READY" | "PLAYING" | "FINISHED">("CONNECTING");
     const [homeLineup, setHomeLineup] = useState<PlayerInfo[]>([]);
     const [awayLineup, setAwayLineup] = useState<PlayerInfo[]>([]);
+    const [inningScores, setInningScores] = useState<{ home: Record<number, number>, away: Record<number, number> }>({ home: {}, away: {} });
     const wsRef = useRef<WebSocket | null>(null);
+    const [showOverlay, setShowOverlay] = useState<string | null>(null);
+
+    // ... (inside useEffect for WS) ...
+
+
+    // ... (render) ...
+
+
 
     // Auto-connect removed to allow manual start via button
     // useEffect(() => {
@@ -71,10 +80,22 @@ export default function LiveMatchPage() {
                         if (msg.away) setAwayLineup(msg.away);
                         break;
                     case "PA":
-                        setGameState("PLAYING");
                         if (msg.data) {
                             setLogs((prev) => [msg.data!, ...prev]);
                             setScore({ home: msg.data.home_score, away: msg.data.away_score });
+
+                            // Update inning scores
+                            setInningScores(prev => {
+                                const newScores = {
+                                    home: { ...prev.home },
+                                    away: { ...prev.away }
+                                };
+                                const d = msg.data!;
+                                const team = d.half === "TOP" ? "away" : "home";
+                                if (!newScores[team][d.inning]) newScores[team][d.inning] = 0;
+                                newScores[team][d.inning] += d.result.runs_scored;
+                                return newScores;
+                            });
                         }
                         break;
                     case "FINAL":
@@ -124,7 +145,6 @@ export default function LiveMatchPage() {
     const currentBatterName = logs.length > 0 ? logs[0].current_batter.name : "";
     const currentPitcherName = logs.length > 0 ? logs[0].current_pitcher.name : "";
     const isTop = logs.length > 0 ? logs[0].half === "TOP" : true;
-
     return (
         <div className={styles.container}>
             {/* Header */}
@@ -150,8 +170,42 @@ export default function LiveMatchPage() {
                 </div>
 
                 <div className={styles.matchInfo}>
+                    {/* Box Score Table */}
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', marginBottom: '10px', color: '#ccc' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid #444' }}>
+                                <th style={{ padding: '4px' }}></th>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => <th key={i} style={{ padding: '4px', fontWeight: 'normal' }}>{i}</th>)}
+                                <th style={{ padding: '4px', fontWeight: 'bold', color: 'white' }}>R</th>
+                                <th style={{ padding: '4px', fontWeight: 'bold', color: 'white' }}>H</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style={{ padding: '4px', textAlign: 'left', fontWeight: 'bold' }}>AWAY</td>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
+                                    <td key={i} style={{ padding: '4px', textAlign: 'center' }}>
+                                        {inningScores.away[i] !== undefined ? inningScores.away[i] : '-'}
+                                    </td>
+                                ))}
+                                <td style={{ padding: '4px', fontWeight: 'bold', color: '#fbbf24' }}>{score.away}</td>
+                                <td style={{ padding: '4px' }}>{logs.filter(l => l.half === 'TOP' && ['HIT_SINGLE', 'HIT_DOUBLE', 'HIT_TRIPLE', 'HOMERUN'].includes(l.result.result_code)).length}</td>
+                            </tr>
+                            <tr>
+                                <td style={{ padding: '4px', textAlign: 'left', fontWeight: 'bold' }}>HOME</td>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
+                                    <td key={i} style={{ padding: '4px', textAlign: 'center' }}>
+                                        {inningScores.home[i] !== undefined ? inningScores.home[i] : '-'}
+                                    </td>
+                                ))}
+                                <td style={{ padding: '4px', fontWeight: 'bold', color: '#fbbf24' }}>{score.home}</td>
+                                <td style={{ padding: '4px' }}>{logs.filter(l => l.half === 'BOTTOM' && ['HIT_SINGLE', 'HIT_DOUBLE', 'HIT_TRIPLE', 'HOMERUN'].includes(l.result.result_code)).length}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
                     {gameState === "READY" && (
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                             <button className={styles.startButton} onClick={handleStart}>
                                 START GAME
                             </button>
@@ -165,24 +219,28 @@ export default function LiveMatchPage() {
                         </div>
                     )}
                     {(gameState === "CONNECTING") && (
-                        <button
-                            className={styles.startButton}
-                            onClick={handleReplaySimulation}
-                            style={{ backgroundColor: '#8b5cf6', boxShadow: '0 4px 0 #7c3aed' }}
-                        >
-                            REPLAY SIM
-                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                            <button
+                                className={styles.startButton}
+                                onClick={handleReplaySimulation}
+                                style={{ backgroundColor: '#8b5cf6', boxShadow: '0 4px 0 #7c3aed' }}
+                            >
+                                REPLAY SIM
+                            </button>
+                        </div>
                     )}
                     {gameState === "PLAYING" && logs.length > 0 && (
-                        <>
+                        <div style={{ textAlign: 'center', marginTop: '5px' }}>
                             <div className={styles.inning}>
                                 {logs[0].half === "TOP" ? "▲" : "▼"} {logs[0].inning}
                             </div>
-                            <div style={{ color: '#888' }}>In Progress</div>
-                        </>
+                            <div style={{ color: '#888', fontSize: '0.8rem' }}>
+                                {logs[0].outs} Out{logs[0].outs !== 1 ? 's' : ''}
+                            </div>
+                        </div>
                     )}
                     {gameState === "FINISHED" && (
-                        <div className={styles.inning} style={{ color: '#ef4444' }}>FINAL</div>
+                        <div className={styles.inning} style={{ color: '#ef4444', textAlign: 'center' }}>FINAL</div>
                     )}
                 </div>
 
@@ -193,7 +251,26 @@ export default function LiveMatchPage() {
             </div>
 
             {/* Main Content */}
-            <div className={styles.mainContent} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className={styles.mainContent} style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
+
+                {/* Visual Effect Overlay */}
+                {showOverlay && (
+                    <div style={{
+                        position: 'absolute',
+                        top: '40%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        fontSize: '3rem',
+                        fontWeight: 'bold',
+                        color: 'white',
+                        textShadow: '0 0 10px rgba(0,0,0,0.8)',
+                        zIndex: 50,
+                        pointerEvents: 'none',
+                        animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                    }}>
+                        {showOverlay}
+                    </div>
+                )}
 
                 {/* Broadcast View: Lineup | Batter | Field | Pitcher | Lineup */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr', gap: '10px', alignItems: 'start' }}>
@@ -235,6 +312,7 @@ export default function LiveMatchPage() {
                         <BaseballField
                             runners={logs.length > 0 ? logs[0].runners : [null, null, null]}
                             pitcherName={currentPitcherName}
+                            lastResult={logs.length > 0 ? logs[0].result : null}
                         />
                     </div>
 
