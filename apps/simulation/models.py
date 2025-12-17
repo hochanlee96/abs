@@ -69,6 +69,7 @@ class ManagerDecision(BaseModel):
     """감독의 작전 지시"""
     offense_strategy: TeamStrategy = TeamStrategy.NORMAL # 공격 작전
     defense_strategy: TeamStrategy = TeamStrategy.NORMAL # 수비 작전
+    change_pitcher: bool = Field(default=False, description="투수 교체 여부 (체력 저하 시 True)")
     description: str = Field(..., description="작전 지시 이유 (LLM 생각)")
 
 class PitcherDecision(BaseModel):
@@ -92,31 +93,79 @@ class Character(BaseModel):
     character_id: str
     name: str
     role: Role
-    # Ability Stats
+    # Ability Stats (Basic)
     contact: int = Field(..., description="타자: 컨택 / 투수: 제구(Control)")
     power: int = Field(..., description="타자: 파워 / 투수: 구위(Stuff)")
     speed: int = Field(..., description="타자: 스피드 / 투수: 구속(Velocity)")
 
+    # --- [Phase 2] Extended Stats ---
+    # Common
+    mental: int = Field(50, description="멘탈/위기관리 (0-100)")
+    
+    # Pitcher Specific
+    stamina: int = Field(100, description="체력 (투구수 영향)")
+    recovery: int = Field(50, description="회복력")
+    velocity_max: int = Field(145, description="최고 구속")
+    
+    pitch_fastball: int = Field(50, description="직구 숙련도")
+    pitch_slider: int = Field(50, description="슬라이더 숙련도")
+    pitch_curve: int = Field(50, description="커브 숙련도")
+    pitch_changeup: int = Field(50, description="체인지업 숙련도")
+    pitch_splitter: int = Field(50, description="스플리터 숙련도")
+    
+    # Batter Specific
+    eye: int = Field(50, description="선구안")
+    clutch: int = Field(50, description="득점권 타율 보정")
+    
+    contact_left: int = Field(50, description="좌투수 상대 컨택")
+    contact_right: int = Field(50, description="우투수 상대 컨택")
+    power_left: int = Field(50, description="좌투수 상대 파워")
+    power_right: int = Field(50, description="우투수 상대 파워")
+    
+    # Fielder Specific
+    defense_range: int = Field(50, description="수비 범위")
+    defense_error: int = Field(50, description="포구 실책 빈도 (낮을수록 좋음)")
+    defense_arm: int = Field(50, description="송구력")
+    
+    position_main: str = Field("DH", description="주 포지션")
+    position_sub: Optional[str] = Field(None, description="부 포지션")
+
     @property
     def pitcher_stats(self):
-        """투수 능력치 매핑"""
+        """투수 능력치 매핑 (확장)"""
         if self.role != Role.PITCHER:
             return None
         return {
-            "control": self.contact,
-            "stuff": self.power,
-            "velocity": self.speed
+            "control": self.contact, # 기존 유지
+            "stuff": self.power,     # 기존 유지
+            "velocity": self.speed,  # 기존 유지
+            "stamina": self.stamina,
+            "mental": self.mental,
+            "pitches": {
+                "fastball": self.pitch_fastball,
+                "slider": self.pitch_slider,
+                "curve": self.pitch_curve,
+                "changeup": self.pitch_changeup,
+                "splitter": self.pitch_splitter
+            }
         }
 
     @property
     def batter_stats(self):
-        """타자 능력치 매핑"""
+        """타자 능력치 매핑 (확장)"""
         if self.role != Role.BATTER:
             return None
         return {
             "contact": self.contact,
             "power": self.power,
-            "speed": self.speed
+            "speed": self.speed,
+            "eye": self.eye,
+            "clutch": self.clutch,
+            "defense": {
+                "range": self.defense_range,
+                "error": self.defense_error,
+                "arm": self.defense_arm
+            }
         }
 
 class PlayerState(BaseModel):
@@ -124,18 +173,35 @@ class PlayerState(BaseModel):
     character: Character
     current_stamina: int = 100
     condition: str = "NORMAL"
+    pitch_count: int = 0 # 투구 수
 
 class Team(BaseModel):
     team_id: str
     name: str
     roster: List[PlayerState] = []
+    current_pitcher_index: int = 0 # 현재 등판 중인 투수의 인덱스 (roster 내의 PITCHER 필터링 기준 아님, 전체 로스터 기준이 편함)
+    # 하지만 roster엔 타자도 섞여있음. PITCHER 역할인 선수들만 모아놓은 인덱스 관리가 필요.
     
+    def get_pitchers(self) -> List[PlayerState]:
+        return [p for p in self.roster if p.character.role == Role.PITCHER]
+
     def get_pitcher(self) -> PlayerState:
-        # 간단한 로직: 로스터의 첫 번째 투수 반환 (향후 로테이션 적용)
-        for p in self.roster:
-            if p.character.role == Role.PITCHER:
-                return p
-        return None
+        """현재 마운드에 있는 투수 반환"""
+        pitchers = self.get_pitchers()
+        if not pitchers:
+            return None
+        # 인덱스 보호
+        if self.current_pitcher_index >= len(pitchers):
+            self.current_pitcher_index = len(pitchers) - 1
+        return pitchers[self.current_pitcher_index]
+    
+    def change_pitcher(self) -> bool:
+        """다음 투수로 교체 (성공 시 True)"""
+        pitchers = self.get_pitchers()
+        if self.current_pitcher_index + 1 < len(pitchers):
+            self.current_pitcher_index += 1
+            return True
+        return False
 
     def get_batter(self, order: int) -> PlayerState:
         # 타순에 따른 타자 반환 (투수 제외한 선수들로 구성 가정)
@@ -223,21 +289,10 @@ class GameState(BaseModel):
 
 # --- IO / Broadcast Models ---
 
-class ResultCode(str, Enum):
-    SO = "SO"
-    BB = "BB"
-    HBP = "HBP"
-    FO = "FO"
-    GO = "GO"
-    SINGLE = "1B"
-    DOUBLE = "2B"
-    TRIPLE = "3B"
-    HR = "HR"
-
 class SimulationResult(BaseModel):
     """LLM이 생성한 타석 결과"""
-    reasoning: str = Field(..., description="결과 판정의 논리적 이유 (Physics/Rule logic)")
-    result_code: ResultCode # Enum enforced
+    reasoning: str = Field(description="판정 추론 과정 (STEP-BY-STEP Thinking)") # CoT
+    result_code: str # HIT, OUT, HOMERUN, WALK, STRIKEOUT ...
     description: str # 중계 멘트
     runners_advanced: bool = False
     
@@ -250,6 +305,13 @@ class SimulationResult(BaseModel):
     # Detail Info
     pitch_desc: str = "" # 어떤 공을 던졌는지
     hit_desc: str = ""   # 어떻게 쳤는지
+
+class ValidatorResult(BaseModel):
+    """검증 에이전트(Rule Expert)의 판정 결과"""
+    is_valid: bool = Field(..., description="야구 규칙 및 논리적 정합성 준수 여부")
+    reasoning: str = Field(..., description="검증 결과에 대한 근거 (CoT)")
+    error_type: Optional[str] = Field(None, description="오류 유형 (LogicError, RuleViolation, Hallucination)")
+    correction_suggestion: Optional[str] = Field(None, description="수정 제안 (필요 시)")
 
 class BroadcastData(BaseModel):
     """프론트엔드로 전송될 최종 데이터 구조"""
