@@ -25,12 +25,29 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isPitcher = false, labe
             <div style={{ fontSize: '12px', color: '#d1d5db', marginBottom: '8px' }}>{player.role}</div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                {Object.entries(player.stats || {}).map(([key, value]) => (
-                    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', background: '#374151', padding: '4px 8px', borderRadius: '4px' }}>
-                        <span style={{ color: '#9ca3af', textTransform: 'capitalize' }}>{key}</span>
-                        <span style={{ fontWeight: 'bold' }}>{value}</span>
-                    </div>
-                ))}
+                {Object.entries(player.stats || {}).map(([key, value]) => {
+                    if (typeof value === 'object' && value !== null) {
+                        return (
+                             <div key={key} style={{ gridColumn: 'span 2', background: '#374151', padding: '4px 8px', borderRadius: '4px' }}>
+                                <div style={{ color: '#9ca3af', textTransform: 'capitalize', marginBottom: '4px' }}>{key}</div>
+                                <div style={{ display: 'flex', gap: '8px', fontSize: '11px' }}>
+                                    {Object.entries(value).map(([subKey, subValue]) => (
+                                        <div key={subKey}>
+                                            <span style={{ color: '#d1d5db', marginRight: '4px' }}>{subKey}:</span>
+                                            <span style={{ fontWeight: 'bold' }}>{String(subValue)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                             </div>
+                        );
+                    }
+                    return (
+                        <div key={key} style={{ display: 'flex', justifyContent: 'space-between', background: '#374151', padding: '4px 8px', borderRadius: '4px' }}>
+                            <span style={{ color: '#9ca3af', textTransform: 'capitalize' }}>{key}</span>
+                            <span style={{ fontWeight: 'bold' }}>{String(value)}</span>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
