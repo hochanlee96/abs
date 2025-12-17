@@ -236,6 +236,7 @@ class ResultCode(str, Enum):
 
 class SimulationResult(BaseModel):
     """LLM이 생성한 타석 결과"""
+    reasoning: str = Field(..., description="결과 판정의 논리적 이유 (Physics/Rule logic)")
     result_code: ResultCode # Enum enforced
     description: str # 중계 멘트
     runners_advanced: bool = False

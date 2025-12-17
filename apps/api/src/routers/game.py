@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Header
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
@@ -11,6 +11,9 @@ from ..crud_accounts import upsert_account_from_google
 from ..simulation_runner import run_match_background
 
 router = APIRouter()
+
+def get_auth_payload(authorization: str | None = Header(default=None)):
+    return verify_google_id_token_from_header(authorization)
 
 # Pydantic models for request body
 class WorldCreate(BaseModel):
@@ -57,8 +60,19 @@ def get_team(team_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Team not found")
     return team
 
+@router.get("/worlds/{world_id}/teams")
+def list_world_teams(world_id: int, db: Session = Depends(get_db)):
+    return crud_game.get_teams_by_world(db, world_id)
+
+@router.get("/worlds/{world_id}/matches")
+def list_world_matches(world_id: int, db: Session = Depends(get_db)):
+    return crud_game.get_matches_by_world(db, world_id)
+
 @router.post("/characters")
-def create_character(char: CharacterCreate, db: Session = Depends(get_db)):
+def create_character(char: CharacterCreate, db: Session = Depends(get_db), payload: dict = Depends(get_auth_payload)):
+    # Upsert account to ensure it exists and get ID
+    acc = upsert_account_from_google(db, payload)
+    
     if char.is_user_created:
         total_points = char.contact + char.power + char.speed
         if total_points != 10:
@@ -68,7 +82,7 @@ def create_character(char: CharacterCreate, db: Session = Depends(get_db)):
         db, 
         char.world_id, 
         char.nickname, 
-        char.owner_account_id, 
+        acc.account_id, # Enforce ownership
         char.is_user_created,
         char.contact,
         char.power,
@@ -83,7 +97,7 @@ def get_character(character_id: int, db: Session = Depends(get_db)):
     return char
 
 @router.delete("/characters/{character_id}")
-def delete_character(character_id: int, db: Session = Depends(get_db), payload: dict = Depends(verify_google_id_token_from_header)):
+def delete_character(character_id: int, db: Session = Depends(get_db), payload: dict = Depends(get_auth_payload)):
     # Optional: Verify ownership
     acc = upsert_account_from_google(db, payload)
     char = crud_game.get_character(db, character_id)
@@ -108,14 +122,17 @@ def get_match(match_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Match not found")
     return match
 
+class PlayRequest(BaseModel):
+    world_id: Optional[int] = None
+
 @router.post("/play")
-def play_match(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def play_match(body: PlayRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Finds the next SCHEDULED match and starts the simulation in background.
     """
     # 1. Find a generic scheduled match (or create one for testing?)
     # For now, just pick the first SCHEDULED match.
-    match = crud_game.get_next_scheduled_match(db)
+    match = crud_game.get_next_scheduled_match(db, body.world_id)
     if not match:
         raise HTTPException(status_code=404, detail="No scheduled matches found")
     
@@ -137,7 +154,7 @@ def perform_training(character_id: int, body: TrainingPerform, db: Session = Dep
     return char
 
 @router.get("/me/characters")
-def list_my_characters(db: Session = Depends(get_db), payload: dict = Depends(verify_google_id_token_from_header)):
+def list_my_characters(db: Session = Depends(get_db), payload: dict = Depends(get_auth_payload)):
     acc = upsert_account_from_google(db, payload)
     return crud_game.get_characters_by_account(db, acc.account_id)
 

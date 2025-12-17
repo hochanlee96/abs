@@ -153,7 +153,11 @@ RESOLVER_PROMPT = """
 3. 득점도 직접 계산하세요.
 
 결과를 JSON으로 출력하세요.
-- `result_code`: (HIT_SINGLE, HIT_DOUBLE, HIT_TRIPLE, HOMERUN, WALK, STRIKEOUT, OUT_GROUND, OUT_FLY, OUT_LINE, ERROR, HIT_BY_PITCH)
+- `reasoning`: 타구의 질, 수비 위치, 주자 속도 등을 고려한 판정 이유
+- `result_code`: (1B, 2B, 3B, HR, BB, SO, FO, GO, HBP, ERROR)
+    - 1B=1루타, 2B=2루타, 3B=3루타, HR=홈런
+    - BB=볼넷, SO=삼진, HBP=사구
+    - FO=뜬공아웃, GO=땅볼아웃, ERROR=실책
 - `description`: 생생한 중계 멘트 (투수 vs 타자 및 주자 플레이 묘사)
 - `final_bases`: **[1루주자, 2루주자, 3루주자]** 리스트. (인덱스 주의)
     - **Index 0 = 1루 (1st Base)**

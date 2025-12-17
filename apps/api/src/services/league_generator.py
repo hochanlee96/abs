@@ -82,6 +82,11 @@ def generate_league(db: Session, user_character_id: int, world_name: str = "New 
             # Link TeamPlayer
             db.add(TeamPlayer(team_id=team.team_id, character_id=npc.character_id, role=Role.AI))
             
+    # Add User to Team 0 explicitly now
+    # Also update user character's world_id to the new world
+    user_char.world_id = world.world_id
+    db.add(user_char)
+    
     db.commit()
     
     # 4. Generate Schedule (Round Robin)

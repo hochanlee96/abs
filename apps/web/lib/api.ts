@@ -55,9 +55,13 @@ export async function apiCreateCharacter(idToken: string, data: { nickname: stri
   const me = await apiGetMe(idToken);
 
   // 3. Create Character
+  console.log("Creating character with token:", idToken?.substring(0, 10) + "...");
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/characters`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${idToken}`
+    },
     body: JSON.stringify({
       world_id: world.world_id,
       nickname: data.nickname,
@@ -86,4 +90,54 @@ export async function apiDeleteCharacter(idToken: string): Promise<void> {
     headers: { Authorization: `Bearer ${idToken}` }
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+export async function apiInitLeague(idToken: string, userCharacterId: number, worldName: string): Promise<any> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/league/init`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ user_character_id: userCharacterId, world_name: worldName })
+  });
+  if (!res.ok) throw new Error(`Failed to init league: ${res.status}`);
+  return res.json();
+}
+
+export async function apiGetWorldTeams(idToken: string, worldId: number): Promise<any[]> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/worlds/${worldId}/teams`, {
+    headers: { Authorization: `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error("Failed to get teams");
+  return res.json();
+}
+
+export async function apiGetWorldMatches(idToken: string, worldId: number): Promise<any[]> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/worlds/${worldId}/matches`, {
+    headers: { Authorization: `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error("Failed to get matches");
+  return res.json();
+}
+
+export async function apiPlayMatch(idToken: string, worldId?: number): Promise<{ status: string; match_id: number }> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/play`, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${idToken}` 
+    },
+    body: JSON.stringify({ world_id: worldId })
+  });
+  if (!res.ok) throw new Error("Failed to start match simulation");
+  return res.json();
+}
+
+export async function apiGetMatch(idToken: string, matchId: number): Promise<any> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/matches/${matchId}`, {
+    headers: { Authorization: `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error("Failed to get match details");
+  return res.json();
 }
