@@ -29,6 +29,23 @@ export interface Character {
 
 const LOCAL_STORAGE_KEY = 'abs_character_data';
 
+export interface CharacterStats {
+  games_played: number;
+  at_bats: number;
+  hits: number;
+  homeruns: number;
+  rbis: number;
+  batting_average: number;
+}
+
+export async function apiGetCharacterStats(characterId: number): Promise<CharacterStats> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/characters/${characterId}/stats`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch stats");
+  }
+  return res.json();
+}
+
 export async function apiGetMyCharacter(idToken: string): Promise<Character | null> {
   // Try backend first
   try {

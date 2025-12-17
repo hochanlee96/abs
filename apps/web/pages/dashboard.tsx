@@ -32,13 +32,23 @@ export default function Dashboard() {
         <div className={styles.card}>
           <h2>🎮 Play Game</h2>
           <p>Start a new baseball game</p>
-          <button className={styles.button}>Coming Soon</button>
+          <button
+            className={styles.button}
+            onClick={() => router.push("/match/live?matchId=1")}
+          >
+            Play Now
+          </button>
         </div>
 
         <div className={styles.card}>
           <h2>📊 Statistics</h2>
           <p>View your performance stats</p>
-          <button className={styles.button}>Coming Soon</button>
+          <button
+            className={styles.button}
+            onClick={() => router.push("/statistics")}
+          >
+            View Stats
+          </button>
         </div>
 
         <div className={styles.card}>
