@@ -1,0 +1,557 @@
+.container {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: white;
+}
+
+.loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-size: 1.5rem;
+  color: var(--secondary);
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.backButton {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.backButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateX(-2px);
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  color: var(--secondary);
+  font-size: 1rem;
+}
+
+/* Character Card */
+.characterCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.characterName {
+  text-align: center;
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: var(--primary);
+}
+
+.statsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.statRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.statHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.statName {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.statIcon {
+  font-size: 1.5rem;
+}
+
+.statLevel {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.progressBar {
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressFill {
+  height: 100%;
+  transition: width 0.5s ease;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.progressFill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.3),
+      transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.xpText {
+  text-align: right;
+  font-size: 0.9rem;
+  color: var(--secondary);
+}
+
+/* Training Section */
+.trainingsSection {
+  margin-bottom: 2rem;
+}
+
+.trainingsSection h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: white;
+}
+
+.trainingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.trainingCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.trainingCard:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary);
+  box-shadow: 0 8px 24px rgba(96, 165, 250, 0.2);
+}
+
+.trainingIcon {
+  font-size: 4rem;
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.trainingName {
+  font-size: 1.3rem;
+  margin: 0;
+  color: white;
+}
+
+.trainingDescription {
+  color: var(--secondary);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.xpBadge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.trainButton {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, var(--primary) 0%, #a78bfa 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: auto;
+}
+
+.trainButton:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 8px 16px rgba(96, 165, 250, 0.3);
+}
+
+.trainButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Training Log */
+.logSection {
+  margin-top: 2rem;
+}
+
+.logSection h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: white;
+}
+
+.logContainer {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.logItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  margin-bottom: 0.5rem;
+  transition: all 0.2s;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.logItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.logIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.logContent {
+  flex: 1;
+}
+
+.logTitle {
+  font-weight: 600;
+  font-size: 1rem;
+  color: white;
+  margin-bottom: 0.25rem;
+}
+
+.logDetails {
+  font-size: 0.85rem;
+  color: var(--secondary);
+}
+
+.logTime {
+  font-size: 0.8rem;
+  color: var(--secondary);
+  white-space: nowrap;
+}
+
+/* Level Up Overlay */
+.levelUpOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.levelUpCard {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border: 2px solid var(--primary);
+  border-radius: 24px;
+  padding: 3rem;
+  text-align: center;
+  animation: scaleIn 0.5s ease;
+  box-shadow: 0 20px 60px rgba(96, 165, 250, 0.4);
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.levelUpIcon {
+  font-size: 5rem;
+  margin-bottom: 1rem;
+  animation: bounce 0.6s ease infinite;
+}
+
+@keyframes bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.levelUpCard h2 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.levelUpCard p {
+  font-size: 1.3rem;
+  color: var(--secondary);
+}
+
+.levelUpCard strong {
+  color: var(--primary);
+  font-size: 1.5rem;
+}
+
+/* Bonus Notification */
+.bonusNotification {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border: 2px solid #fff;
+  border-radius: 16px;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  z-index: 999;
+  animation: bounceIn 0.5s ease;
+  box-shadow: 0 20px 60px rgba(251, 191, 36, 0.6);
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+.bonusMessage {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+.bonusXp {
+  font-size: 2rem;
+  font-weight: 800;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Streak Badge */
+.streakBadge {
+  background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Critical Badge in Log */
+.criticalBadge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: white;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  animation: glow 1.5s ease-in-out infinite;
+}
+
+@keyframes glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(251, 191, 36, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.8);
+  }
+}
+
+/* Scrollbar Styling */
+.logContainer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.logContainer::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.logContainer::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.logContainer::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+
+  .header h1 {
+    font-size: 2rem;
+  }
+
+  .backButton {
+    position: static;
+    margin-bottom: 1rem;
+  }
+
+  .trainingsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .characterCard {
+    padding: 1.5rem;
+  }
+
+  .levelUpCard {
+    padding: 2rem;
+    margin: 1rem;
+  }
+
+  .levelUpCard h2 {
+    font-size: 2rem;
+  }
+
+  .levelUpIcon {
+    font-size: 4rem;
+  }
+}
