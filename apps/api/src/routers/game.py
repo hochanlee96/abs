@@ -118,7 +118,5 @@ def perform_training(character_id: int, body: TrainingPerform, db: Session = Dep
         raise HTTPException(status_code=400, detail="Training failed (Character or Training not found)")
     return char
 
-@router.get("/me/characters")
-def list_my_characters(db: Session = Depends(get_db), payload: dict = Depends(verify_google_id_token_from_header)):
     acc = upsert_account_from_google(db, payload)
     return crud_game.get_characters_by_account(db, acc.account_id)

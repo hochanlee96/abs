@@ -7,7 +7,7 @@ from .crud_accounts import upsert_account_from_google
 from .models import Base
 from .db import engine
 
-from .routers import game
+from .routers import game, simulation_stream, stats
 
 app = FastAPI(title="Baseball Sim API")
 
@@ -35,6 +35,8 @@ app.add_middleware(
 )
 
 app.include_router(game.router, prefix="/api/v1", tags=["game"])
+app.include_router(stats.router, prefix="/api/v1", tags=["stats"])
+app.include_router(simulation_stream.router, tags=["simulation"])
 
 @app.get("/health")
 def health():
