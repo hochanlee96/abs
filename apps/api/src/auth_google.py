@@ -6,7 +6,9 @@ from google.auth.transport import requests as grequests
 GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
 
 def verify_google_id_token_from_header(authorization: str | None) -> dict:
+    print(f"[DEBUG] Auth Header: {authorization}")
     if not authorization or not authorization.startswith("Bearer "):
+        print("[DEBUG] Missing Bearer prefix or empty header")
         raise HTTPException(status_code=401, detail="Missing Bearer token")
 
     token = authorization.split(" ", 1)[1].strip()

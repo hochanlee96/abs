@@ -153,7 +153,11 @@ RESOLVER_PROMPT = """
 3. 득점도 직접 계산하세요.
 
 결과를 JSON으로 출력하세요.
-- `result_code`: (HIT_SINGLE, HIT_DOUBLE, HIT_TRIPLE, HOMERUN, WALK, STRIKEOUT, OUT_GROUND, OUT_FLY, OUT_LINE, ERROR, HIT_BY_PITCH)
+- `reasoning`: 타구의 질, 수비 위치, 주자 속도 등을 고려한 판정 이유
+- `result_code`: (1B, 2B, 3B, HR, BB, SO, FO, GO, HBP, ERROR)
+    - 1B=1루타, 2B=2루타, 3B=3루타, HR=홈런
+    - BB=볼넷, SO=삼진, HBP=사구
+    - FO=뜬공아웃, GO=땅볼아웃, ERROR=실책
 - `description`: 생생한 중계 멘트 (투수 vs 타자 및 주자 플레이 묘사)
 - `final_bases`: **[1루주자, 2루주자, 3루주자]** 리스트. (인덱스 주의)
     - **Index 0 = 1루 (1st Base)**
@@ -507,9 +511,57 @@ workflow.add_conditional_edges(
 app = workflow.compile()
 
 # --- Execution Entry ---
-def run_simulation():
-    print("--- Multi-Agent Engine Start ---")
+# --- Execution Entry ---
+def run_engine(
+    initial_game_state: GameState, 
+    director_ctx: DirectorContext = None,
+    home_manager_decision: ManagerDecision = None,
+    away_manager_decision: ManagerDecision = None,
+    on_step_callback=None
+):
+    """
+    API에서 호출 가능한 시뮬레이션 엔진 진입점.
+    initial_game_state: DB에서 로드/변환된 초기 게임 상태
+    on_step_callback: 매 스텝(타석)이 끝날 때마다 호출되는 콜백 함수 (DB 저장용) func(game_state: GameState)
+    """
+    print(f"--- Engine Triggered for Match {initial_game_state.match_id} ---")
     
+    if director_ctx is None:
+        director_ctx = DirectorContext()
+    if home_manager_decision is None:
+        home_manager_decision = ManagerDecision(description="초기화", offense_strategy=TeamStrategy.NORMAL, defense_strategy=TeamStrategy.NORMAL)
+    if away_manager_decision is None:
+        away_manager_decision = ManagerDecision(description="초기화", offense_strategy=TeamStrategy.NORMAL, defense_strategy=TeamStrategy.NORMAL)
+
+    initial_state = {
+        "game": initial_game_state, 
+        "director_ctx": director_ctx,
+        "home_manager_decision": home_manager_decision,
+        "away_manager_decision": away_manager_decision,
+        "pitcher_decision": PitcherDecision(pitch_type=PitchType.FASTBALL, location=PitchLocation.MIDDLE, description="Initial"),
+        "batter_decision": BatterDecision(style=BattingStyle.CAUTIOUS, description="Initial"),
+        "last_result": None
+    }
+    
+    # Run Graph
+    step_count = 0
+    for s in app.stream(initial_state, config={"recursion_limit": 1000}):
+        # s is a dict of updated state keys, e.g., {'update_state': {'game': ...}}
+        
+        # 'update_state' 노드가 실행된 직후에 DB 저장 등 콜백 호출
+        if "update_state" in s:
+            updated_game = s["update_state"]["game"]
+            if on_step_callback:
+                on_step_callback(updated_game)
+            step_count += 1
+            
+    print(f"--- Simulation Finished (Steps: {step_count}) ---")
+    print(f"Final Score: {initial_game_state.away_team.name} {initial_game_state.away_score} : {initial_game_state.home_score} {initial_game_state.home_team.name}")
+    return initial_game_state
+
+def run_simulation_cli():
+    """Local CLI Test Entry"""
+    print("--- Multi-Agent Engine Start (CLI) ---")
     # Clear Logs
     with open("simulation_log.txt", "w", encoding="utf-8") as f:
         f.write("=== Simulation Start ===\n")
@@ -517,22 +569,7 @@ def run_simulation():
         pass
 
     game = init_dummy_game()
-    initial_state = {
-        "game": game, 
-        "director_ctx": DirectorContext(),
-        "home_manager_decision": ManagerDecision(description="초기화", offense_strategy=TeamStrategy.NORMAL, defense_strategy=TeamStrategy.NORMAL),
-        "away_manager_decision": ManagerDecision(description="초기화", offense_strategy=TeamStrategy.NORMAL, defense_strategy=TeamStrategy.NORMAL),
-        "pitcher_decision": PitcherDecision(pitch_type=PitchType.FASTBALL, location=PitchLocation.MIDDLE, description="Initial"),
-        "batter_decision": BatterDecision(style=BattingStyle.CAUTIOUS, description="Initial"),
-        "last_result": None
-    }
-    
-    # Run Graph
-    for s in app.stream(initial_state, config={"recursion_limit": 1000}):
-        pass 
-        
-    print(f"--- Simulation Finished ---")
-    print(f"Final Score: {game.away_team.name} {game.away_score} : {game.home_score} {game.home_team.name}")
+    game = run_engine(game)
 
 if __name__ == "__main__":
-    run_simulation()
+    run_simulation_cli()

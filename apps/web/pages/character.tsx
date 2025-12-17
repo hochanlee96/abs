@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import styles from "../styles/Character.module.css";
-import { apiGetMyCharacter, apiCreateCharacter, apiDeleteCharacter, Character } from "../lib/api";
+import { apiGetMyCharacter, apiCreateCharacter, apiDeleteCharacter, apiInitLeague, Character } from "../lib/api";
 import Modal from "../components/Modal";
 
 type StatType = "contact" | "power" | "speed";
@@ -72,10 +72,16 @@ export default function CharacterPage() {
         nickname,
         ...stats
       });
+      
+      // Auto-initialize League
+      console.log("Auto-initializing league...");
+      await apiInitLeague(idToken, newChar.character_id, `League for ${newChar.nickname}`);
+      
       setCharacter(newChar);
       setIsCreating(false);
-    } catch (e) {
-      alert("Failed to create character");
+    } catch (e: any) {
+      console.error(e);
+      alert(`Failed to create character or initialize league: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -88,6 +94,7 @@ export default function CharacterPage() {
       await apiDeleteCharacter(idToken);
       setCharacter(null);
       setShowDeleteModal(false);
+      setIsCreating(true); // Go directly to creation form
     } catch (e) {
       console.error("Failed to delete character:", e);
       alert("Failed to delete character");
@@ -150,7 +157,7 @@ export default function CharacterPage() {
                   transition: 'all 0.2s'
                 }}
               >
-                Start Game
+                Go to Dashboard
               </button>
               <button 
                 className={styles.deleteButton}
