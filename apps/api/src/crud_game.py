@@ -40,7 +40,28 @@ def create_character(
     is_user_created: bool = False,
     contact: int = 0,
     power: int = 0,
-    speed: int = 0
+    speed: int = 0,
+    # [Phase 2]
+    mental: int = 50,
+    recovery: int = 50,
+    stamina: int = 100,
+    velocity_max: int = 140,
+    pitch_fastball: int = 0,
+    pitch_slider: int = 0,
+    pitch_curve: int = 0,
+    pitch_changeup: int = 0,
+    pitch_splitter: int = 0,
+    eye: int = 50,
+    clutch: int = 50,
+    contact_left: int = 0,
+    contact_right: int = 0,
+    power_left: int = 0,
+    power_right: int = 0,
+    defense_range: int = 50,
+    defense_error: int = 50,
+    defense_arm: int = 50,
+    position_main: str = "DH",
+    position_sub: Optional[str] = None
 ) -> Character:
     char = Character(
         world_id=world_id, 
@@ -49,7 +70,28 @@ def create_character(
         is_user_created=is_user_created,
         contact=contact,
         power=power,
-        speed=speed
+        speed=speed,
+        # [Phase 2]
+        mental=mental,
+        recovery=recovery,
+        stamina=stamina,
+        velocity_max=velocity_max,
+        pitch_fastball=pitch_fastball,
+        pitch_slider=pitch_slider,
+        pitch_curve=pitch_curve,
+        pitch_changeup=pitch_changeup,
+        pitch_splitter=pitch_splitter,
+        eye=eye,
+        clutch=clutch,
+        contact_left=contact_left,
+        contact_right=contact_right,
+        power_left=power_left,
+        power_right=power_right,
+        defense_range=defense_range,
+        defense_error=defense_error,
+        defense_arm=defense_arm,
+        position_main=position_main,
+        position_sub=position_sub
     )
     db.add(char)
     db.commit()

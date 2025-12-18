@@ -32,6 +32,27 @@ class CharacterCreate(BaseModel):
     contact: int = 0
     power: int = 0
     speed: int = 0
+    # [Phase 2]
+    mental: int = 50
+    recovery: int = 50
+    stamina: int = 100
+    velocity_max: int = 140
+    pitch_fastball: int = 0
+    pitch_slider: int = 0
+    pitch_curve: int = 0
+    pitch_changeup: int = 0
+    pitch_splitter: int = 0
+    eye: int = 50
+    clutch: int = 50
+    contact_left: int = 0
+    contact_right: int = 0
+    power_left: int = 0
+    power_right: int = 0
+    defense_range: int = 50
+    defense_error: int = 50
+    defense_arm: int = 50
+    position_main: str = "DH"
+    position_sub: Optional[str] = None
 
 class MatchCreate(BaseModel):
     world_id: int
@@ -86,7 +107,28 @@ def create_character(char: CharacterCreate, db: Session = Depends(get_db), paylo
         char.is_user_created,
         char.contact,
         char.power,
-        char.speed
+        char.speed,
+        # [Phase 2]
+        mental=char.mental,
+        recovery=char.recovery,
+        stamina=char.stamina,
+        velocity_max=char.velocity_max,
+        pitch_fastball=char.pitch_fastball,
+        pitch_slider=char.pitch_slider,
+        pitch_curve=char.pitch_curve,
+        pitch_changeup=char.pitch_changeup,
+        pitch_splitter=char.pitch_splitter,
+        eye=char.eye,
+        clutch=char.clutch,
+        contact_left=char.contact_left,
+        contact_right=char.contact_right,
+        power_left=char.power_left,
+        power_right=char.power_right,
+        defense_range=char.defense_range,
+        defense_error=char.defense_error,
+        defense_arm=char.defense_arm,
+        position_main=char.position_main,
+        position_sub=char.position_sub
     )
 
 @router.get("/characters/{character_id}")

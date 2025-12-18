@@ -1,0 +1,29 @@
+Traceback (most recent call last):
+  File "C:\Users\campus1N019\Desktop\ABS_V4\apps\simulation\engine.py", line 811, in <module>
+    run_simulation_cli()
+  File "C:\Users\campus1N019\Desktop\ABS_V4\apps\simulation\engine.py", line 806, in run_simulation_cli
+    run_engine(game)
+  File "C:\Users\campus1N019\Desktop\ABS_V4\apps\simulation\engine.py", line 781, in run_engine
+    for s in app.stream(initial_state, config={"recursion_limit": 1000}):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\campus1N019\AppData\Local\Programs\Python\Python312\Lib\site-packages\langgraph\pregel\main.py", line 2643, in stream
+    for _ in runner.tick(
+             ^^^^^^^^^^^^
+  File "C:\Users\campus1N019\AppData\Local\Programs\Python\Python312\Lib\site-packages\langgraph\pregel\_runner.py", line 167, in tick
+    run_with_retry(
+  File "C:\Users\campus1N019\AppData\Local\Programs\Python\Python312\Lib\site-packages\langgraph\pregel\_retry.py", line 42, in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\campus1N019\AppData\Local\Programs\Python\Python312\Lib\site-packages\langgraph\_internal\_runnable.py", line 656, in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\campus1N019\AppData\Local\Programs\Python\Python312\Lib\site-packages\langgraph\_internal\_runnable.py", line 400, in invoke
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\campus1N019\Desktop\ABS_V4\apps\simulation\engine.py", line 644, in update_state_node
+    raise e
+  File "C:\Users\campus1N019\Desktop\ABS_V4\apps\simulation\engine.py", line 509, in update_state_node
+    print(f"DEBUG: potential runners: {[p.character.name for p in potential_runners]}")
+                                                                  ^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'potential_runners' where it is not associated with a value
+During task with name 'update_state' and id 'feee2a3c-073e-d9da-ce15-be69868bc5c0'

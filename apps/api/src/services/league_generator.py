@@ -76,7 +76,27 @@ def generate_league(db: Session, user_character_id: int, world_name: str = "New 
                 is_user_created=False,
                 contact=con, 
                 power=pow, 
-                speed=spd
+                speed=spd,
+                # [Phase 2] Random Stats
+                mental=random.randint(40, 70),
+                recovery=random.randint(40, 80),
+                stamina=random.randint(60, 100) if i == 0 else random.randint(30, 80), # 1선발은 체력 높게
+                velocity_max=int(random.gauss(140, 5)),
+                pitch_fastball=int(random.gauss(50, 10)),
+                pitch_slider=int(random.gauss(40, 10)),
+                pitch_curve=int(random.gauss(40, 10)),
+                pitch_changeup=int(random.gauss(40, 10)),
+                pitch_splitter=int(random.gauss(30, 10)),
+                eye=int(random.gauss(50, 10)),
+                clutch=int(random.gauss(50, 10)),
+                contact_left=int(random.gauss(con*10, 10)), # 기본값 * 10 스케일
+                contact_right=int(random.gauss(con*10, 10)),
+                power_left=int(random.gauss(pow*10, 10)),
+                power_right=int(random.gauss(pow*10, 10)),
+                defense_range=int(random.gauss(50, 15)),
+                defense_error=int(random.gauss(50, 15)),
+                defense_arm=int(random.gauss(50, 15)),
+                position_main="PITCHER" if _ == 0 else "FIELDER" # 단순화: 첫 번째는 투수
             )
             
             # Link TeamPlayer

@@ -10,6 +10,7 @@ services:
       - "3307:3306"
     volumes:
       - ./initdb:/docker-entrypoint-initdb.d
+      - mariadb_data:/var/lib/mysql
     healthcheck:
       test: [ "CMD-SHELL", "mariadb-admin ping -h localhost -p${MARIADB_ROOT_PASSWORD}" ]
       interval: 5s
@@ -48,3 +49,6 @@ services:
     volumes:
       - ../apps/web:/app
       - /app/node_modules
+
+volumes:
+  mariadb_data:

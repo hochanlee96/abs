@@ -87,6 +87,34 @@ class Character(Base):
     power: Mapped[int] = mapped_column(Integer, default=50)
     speed: Mapped[int] = mapped_column(Integer, default=50)
 
+    # [Phase 2] Extended Stats
+    mental: Mapped[int] = mapped_column(Integer, default=50)
+    recovery: Mapped[int] = mapped_column(Integer, default=50)
+    
+    # Pitcher Specific
+    stamina: Mapped[int] = mapped_column(Integer, default=100)
+    velocity_max: Mapped[int] = mapped_column(Integer, default=140)
+    pitch_fastball: Mapped[int] = mapped_column(Integer, default=0)
+    pitch_slider: Mapped[int] = mapped_column(Integer, default=0)
+    pitch_curve: Mapped[int] = mapped_column(Integer, default=0)
+    pitch_changeup: Mapped[int] = mapped_column(Integer, default=0)
+    pitch_splitter: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Batter Specific
+    eye: Mapped[int] = mapped_column(Integer, default=50)
+    clutch: Mapped[int] = mapped_column(Integer, default=50)
+    contact_left: Mapped[int] = mapped_column(Integer, default=0)
+    contact_right: Mapped[int] = mapped_column(Integer, default=0)
+    power_left: Mapped[int] = mapped_column(Integer, default=0)
+    power_right: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Fielder Specific
+    defense_range: Mapped[int] = mapped_column(Integer, default=50)
+    defense_error: Mapped[int] = mapped_column(Integer, default=50)
+    defense_arm: Mapped[int] = mapped_column(Integer, default=50)
+    position_main: Mapped[str] = mapped_column(String(20), default="DH")
+    position_sub: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     world: Mapped["World"] = relationship(back_populates="characters")
     owner: Mapped[Optional["Account"]] = relationship(back_populates="characters")
     team_players: Mapped[List["TeamPlayer"]] = relationship(back_populates="character")

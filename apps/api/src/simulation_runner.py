@@ -54,7 +54,31 @@ def run_match_background(match_id: int, db: Session):
             role=role,
             contact=db_char.contact,
             power=db_char.power,
-            speed=db_char.speed
+            speed=db_char.speed,
+            # [Phase 2]
+            mental=db_char.mental,
+            stamina=db_char.stamina,
+            recovery=db_char.recovery,
+            velocity_max=db_char.velocity_max,
+            
+            pitch_fastball=db_char.pitch_fastball,
+            pitch_slider=db_char.pitch_slider,
+            pitch_curve=db_char.pitch_curve,
+            pitch_changeup=db_char.pitch_changeup,
+            pitch_splitter=db_char.pitch_splitter,
+            
+            eye=db_char.eye,
+            clutch=db_char.clutch,
+            contact_left=db_char.contact_left,
+            contact_right=db_char.contact_right,
+            power_left=db_char.power_left,
+            power_right=db_char.power_right,
+            
+            defense_range=db_char.defense_range,
+            defense_error=db_char.defense_error,
+            defense_arm=db_char.defense_arm,
+            position_main=db_char.position_main,
+            position_sub=db_char.position_sub
         )
 
     # Helper to build Team roster
@@ -206,7 +230,8 @@ def run_match_background(match_id: int, db: Session):
     
     # 4. Run Engine
     try:
-        final_state = engine.run_engine(game_state, on_step_callback=on_step)
+        # [Phase 2] Injected DB session
+        final_state = engine.run_engine(game_state=game_state, db_session=db, on_step_callback=on_step)
         
         # Match Finished
         match.status = MatchStatus.FINISHED

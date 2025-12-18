@@ -79,6 +79,35 @@ CREATE TABLE characters (
   power INT NOT NULL DEFAULT 0,
   speed INT NOT NULL DEFAULT 0,
 
+  -- [Phase 2] Extended Stats for Simulation
+  -- Common
+  mental INT NOT NULL DEFAULT 50,
+  recovery INT NOT NULL DEFAULT 50,
+  
+  -- Pitcher Specific
+  stamina INT NOT NULL DEFAULT 100,
+  velocity_max INT NOT NULL DEFAULT 140,
+  pitch_fastball INT NOT NULL DEFAULT 0,
+  pitch_slider INT NOT NULL DEFAULT 0,
+  pitch_curve INT NOT NULL DEFAULT 0,
+  pitch_changeup INT NOT NULL DEFAULT 0,
+  pitch_splitter INT NOT NULL DEFAULT 0,
+
+  -- Batter Specific
+  eye INT NOT NULL DEFAULT 50,
+  clutch INT NOT NULL DEFAULT 50,
+  contact_left INT NOT NULL DEFAULT 0,
+  contact_right INT NOT NULL DEFAULT 0,
+  power_left INT NOT NULL DEFAULT 0,
+  power_right INT NOT NULL DEFAULT 0,
+
+  -- Fielder Specific
+  defense_range INT NOT NULL DEFAULT 50,
+  defense_error INT NOT NULL DEFAULT 50,
+  defense_arm INT NOT NULL DEFAULT 50,
+  position_main VARCHAR(20) NOT NULL DEFAULT 'DH',
+  position_sub VARCHAR(20) NULL,
+
   contact_exp INT NOT NULL DEFAULT 0,
   power_exp INT NOT NULL DEFAULT 0,
   speed_exp INT NOT NULL DEFAULT 0,

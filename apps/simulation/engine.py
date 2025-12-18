@@ -1,7 +1,7 @@
 import os
 import random
 import json
-from typing import TypedDict, Annotated, List, Dict, Optional
+from typing import TypedDict, Annotated, List, Dict, Optional, Any
 from dotenv import load_dotenv
 
 # LangChain / LangGraph
@@ -41,6 +41,7 @@ class SimState(TypedDict):
     validator_result: Optional['ValidatorResult'] # 추가된 검증 결과 | None
     
     retry_count: int # 검증 실패 시 재시도 횟수 tracking
+    db_session: Optional[Any] # DB Session for saving results
 
 # --- Prompt Templates (Agents Thinking) ---
 
@@ -131,77 +132,69 @@ BATTER_PROMPT = """
 
 RESOLVER_PROMPT = """
 당신은 고도로 훈련된 **야구 시뮬레이션 심판(Umpire)이자 물리 엔진**입니다.
-주어진 데이터(선수 능력, 상황, 작전)를 분석하여 **가장 현실적이고 개연성 있는 경기 결과**를 도출하세요.
+주어진 데이터(선수 능력, 상황, 작전)와 **직전 검증 실패 피드백**를 분석하여 **가장 현실적이고 개연성 있는 경기 결과**를 도출하세요.
 
-**[중요] 추론 과정 (Chain of Thought)**
+**[중요] 생각의 사슬 (Chain of Thought) 필수**
 결과를 내기 전에 `reasoning` 필드에 다음 단계로 생각을 정리하세요.
-1. **Matchup Analysis**: 투수의 구위/제구 vs 타자의 컨택/파워 비교. 누가 우위인가?
-2. **Contact Quality**: 타구의 질(속도, 각도, 방향) 결정. 정타인가 빗맞았는가?
-3. **Defense Check**: 타구 방향의 수비수 능력(범위, 어깨) 확인. 잡을 수 있는가?
-4. **Base Running**: 안타/아웃 여부에 따른 주자들의 이동 판단. (무리한 주루 지양)
-5. **Final Decision**: 최종 판정 코드 및 주자 위치 확정.
+1.  **Matchup Analysis**: 투수의 구위/제구 vs 타자의 컨택/파워 비교. 누가 이겼는가?
+2.  **Contact Physics**: 타격이 이겼다면, 공이 어디로, 얼마나 빠르게, 어떤 각도로 날아갔는가?
+3.  **Defense & Fielding**: 그 타구를 수비수가 잡을 수 있는가? (잡으면 아웃, 못 잡으면 안타)
+4.  **Runner Advancement (매우 중요)**:
+    *   **안타(1B/2B/3B)**: 타자는 **반드시** 주자가 되어 루상에 나가야 합니다. (예: 1루타면 타자 이름을 1루에 배치)
+    *   타자가 나가면 기존 주자는 밀려나거나(Force), 추가 진루를 해야 합니다.
+    *   **아웃(Ground/Fly)**: 타자는 덕아웃으로 가고(주자 아님), 기존 주자는 상황에 따라 진루하거나 멈춥니다.
+5.  **Validation Feedback Check**: 이전 피드백을 반드시 반영하여 수정하세요.
 
-[가이드라인 (Scenario Tips)]
-- **내야 땅볼(Ground ball)**:
-  - 1루 주자는 2루로 가다가 아웃되거나(병살타), 2루에 안착합니다. 3루까지 가는 경우는 거의 없습니다.
-  - 타자 주자는 발이 아주 빠르지 않으면 보통 1루에서 아웃입니다.
-- **외야 안타(Single/Double)**:
-  - 단타(Single): 2루 주자는 홈에 들어올 수도 3루에 멈출 수도 있습니다(외야수 어깨 고려). 1루 주자는 보통 2루, 빠르면 3루까지 갑니다.
-  - 장타(Double/Triple): 주자들은 대부분 2~3 베이스를 진루합니다.
-- **외야 뜬공(Fly ball)**:
-  - 3루 주자는 태그업하여 득점할 수 있습니다(희생플라이).
-  - 1루/2루 주자는 보통 움직이지 못합니다.
-- **투수/타자 상성**:
-  - 투수 체력이 낮으면(Stamina < 30) 제구 난조로 볼넷이나 장타 허용 확률이 급증합니다.
-  - 타자의 노림수가 적중하면 안타 확률이 대폭 상승합니다.
+**[Output Format]**
+*   `final_bases`: **반드시 3개의 요소**를 가진 리스트여야 합니다. `[1루주자이름, 2루주자이름, 3루주자이름]`.
+    *   주자가 없으면 `null` (Python: `None`).
+    *   예시: `["Kim Min-ji", null, "Lee Chul-su"]` (1루: 김민지, 2루: 없음, 3루: 이철수)
+*   **주의**: 타자 이름 `{batter_name}`을 결과 리스트의 적절한 위치에 꼭 넣으세요 (안타/볼넷 시).
 
-[환경]
-- 날씨: {weather}, 바람: {wind}, 심판 존: {zone}
+**[Few-shot Examples (정답 노트)]**
+*   **Case 1 (단타 시 주자 이동)**
+    *   상황: 주자 1루(Lee), 타자(Kim) 안타(우전 1루타)
+    *   잘못된 결과: `final_bases`: `["Lee", null, null]` (타자 실종, 1루 중복 불가)
+    *   **올바른 결과**: `final_bases`: `["Kim", "Lee", null]` (타자->1루, 1루주자->2루)
+*   **Case 2 (땅볼 아웃)**
+    *   상황: 주자 없음, 내야 땅볼
+    *   **올바른 결과**: `final_bases`: `[null, null, null]`
 
-[현재 주자 상황]
-- 1루: {runner_1}
-- 2루: {runner_2}
-- 3루: {runner_3}
+[입력 데이터]
+[환경] 날씨: {weather}, 바람: {wind}, 심판 존: {zone}
+[상황] 아웃: {outs}, {runners_status}
+[수비] {defense_lineup}
 
-[수비 라인업 (Defenders)]
-수비수 스탯 (범위: Range, 실책: Error, 어깨: Arm)
-{defense_lineup}
+[투수 {pitcher_name}] {pitch_type}({pitch_location}) | 구속 {velocity}, 구위 {stuff}, 제구 {control}, 멘탈 {mental}
+[타자 {batter_name}] 노림수 {aim_type}, 코스 {aim_location} | 컨택 {contact}, 파워 {power}, 스피드 {speed}
 
-[투수 {pitcher_name}]
-- 의도: {pitch_type} ({pitch_location})
-- 능력: 구속 {velocity}, 구위 {stuff}, 제구 {control}, 체력 {stamina}, 멘탈 {mental}
+[검증 피드백 (이전 시도 실패 사유)]
+{validator_feedback}
 
-[타자 {batter_name}]
-- 의도: 노림수 {aim_type}, 코스 {aim_location}, 스타일 {style}
-- 능력: 컨택 {contact}, 파워 {power}, 스피드 {speed}, 선구안 {eye}, 클러치 {clutch}
-
-[감독 작전]
-- 수비측: {def_strategy}
-- 공격측: {off_strategy}
-
-위 정보를 종합하여 JSON 형식으로 응답하세요.
+위 정보를 종합하여 결과를 JSON으로 출력하세요. `final_bases` 포맷(`[1B, 2B, 3B]`)을 절대 엄수하세요.
 """
+
 
 VALIDATOR_PROMPT = """
 당신은 **야구 규칙 전문가(Baseball Rule Expert)**이자 **데이터 검증관**입니다.
 직전의 게임 상황과 시뮬레이션 결과(`SimulationResult`)를 비교하여 **논리적 오류**나 **규칙 위반**이 없는지 검증하세요.
 
-[검증 기준 (Checklist)]
-1. **Runner Consistency**: 주자가 순간이동하거나 역주행하지 않았는가? (예: 1루 주자가 갑자기 3루에 있거나 사라짐)
-2. **Out Count Logic**: 아웃 종류(삼진, 땅볼 등)에 따라 아웃 카운트가 올바르게 처리될 상황인가?
-3. **Score Logic**: 득점(runs_scored)이 발생했다면, 주자가 홈에 들어올 수 있는 타구였는가? (예: 내야 땅볼에 2루 주자 득점은 매우 드묾)
-4. **Base Occupancy**: 한 루에 두 명의 주자가 있지 않은가?
+**[필수 검증 항목 (Critical Check)]**
+1.  **Hit & Runner Logic**: 결과가 **안타(1B/2B/3B)** 또는 **볼넷(BB)**인데, `final_bases`에 **타자 이름이 없는가?** -> 무조건 **Invalid** (LogicError).
+    *   "안타를 쳤는데 주자가 없다"는 명백한 오류입니다. 타자는 루상에 있어야 합니다.
+2.  **Runner Continuity**: 주자가 갑자기 사라지거나(Out 없이), 1루에서 3루로 점프(2루타 이상 없이)했는가?
+3.  **Base Overlap**: 한 베이스에 이름이 두 개인가? (시스템상 리스트라 불가능하지만 논리적으로 체크)
+4.  **Score Mismatch**: `runs_scored` 점수와 실제로 홈에 들어온 주자 수가 일치하는가?
 
 [직전 상황]
 - 아웃: {outs}, 주자: {runners_before}
 
 [시뮬레이션 판정 결과]
 - 결과: {result_code} ({description})
-- 최종 주자: {final_bases}
+- 최종 주자 목록(final_bases): {final_bases}
 - 득점: {runs_scored}
 
-위 내용을 분석하여 정합성 여부(`is_valid`)와 그 이유(`reasoning`)를 판단하세요.
-문제가 있다면 `error_type`과 `correction_suggestion`을 제시하세요.
+문제가 있다면 `is_valid: false`와 함께 `correction_suggestion`에 "타자 {batter_name}을 1루에 배치하세요" 처럼 구체적으로 지시하세요.
 """
 
 # --- Nodes ---
@@ -383,13 +376,20 @@ def resolver_node(state: SimState):
                  pass
         defense_lineup_str = "\n".join(defense_info_lines)
     
+        # 재시도인 경우 피드백 가져오기
+        val_res = state.get("validator_result")
+        feedback = ""
+        if val_res and not val_res.is_valid:
+            feedback = f"⚠️ [PREVIOUS FAILED]: {val_res.error_type} - {val_res.correction_suggestion}"
+        
+        runners_status = f"주자: 1루[{runners['runner_1']}], 2루[{runners['runner_2']}], 3루[{runners['runner_3']}]"
+
         res = chain.invoke({
             "weather": ctx.weather,
             "wind": ctx.wind_direction,
             "zone": ctx.umpire_zone,
-            "runner_1": runners["runner_1"],
-            "runner_2": runners["runner_2"],
-            "runner_3": runners["runner_3"],
+            "outs": game.outs,
+            "runners_status": runners_status,
             "defense_lineup": defense_lineup_str,
             
             "pitcher_name": pitcher.character.name,
@@ -398,21 +398,18 @@ def resolver_node(state: SimState):
             "velocity": pitcher.character.pitcher_stats["velocity"],
             "stuff": pitcher.character.pitcher_stats["stuff"],
             "control": pitcher.character.pitcher_stats["control"],
-            "stamina": pitcher.character.pitcher_stats.get("stamina", 100), # 안전하게 get 사용
             "mental": pitcher.character.pitcher_stats.get("mental", 50),
             
             "batter_name": batter.character.name,
             "aim_type": b_dec.aim_pitch_type,
             "aim_location": b_dec.aim_location,
-            "style": b_dec.style,
             "contact": batter.character.batter_stats["contact"],
             "power": batter.character.batter_stats["power"],
             "speed": batter.character.batter_stats["speed"],
             "eye": batter.character.batter_stats.get("eye", 50),
             "clutch": batter.character.batter_stats.get("clutch", 50),
             
-            "def_strategy": def_strategy,
-            "off_strategy": off_strategy
+            "validator_feedback": feedback
         })
         
         return {"last_result": res}
@@ -510,17 +507,32 @@ def update_state_node(state: SimState):
         # 현재 필드에 있는 주자들 + 타자 후보군
         potential_runners = [game.bases.basec1, game.bases.basec2, game.bases.basec3, batter]
         potential_runners = [r for r in potential_runners if r is not None]
+
+        # [DEBUG] 제거
         
         # 이름으로 매핑 (동명이인 처리 안됨 - 일단 이름 유니크 가정)
-        player_map = {p.character.name: p for p in potential_runners}
+        # LLM이 띄어쓰기나 대소문자를 틀릴 수 있으므로 정규화해서 매핑
+        def normalize_name(n):
+            return n.replace(" ", "").lower() if n else ""
+            
+        player_map = {normalize_name(p.character.name): p for p in potential_runners}
         
         new_bases_objs = [None, None, None]
         
         for i, r_name in enumerate(res.final_bases):
-            if r_name and r_name in player_map:
-                new_bases_objs[i] = player_map[r_name]
-            elif r_name and r_name == batter.character.name: # 타자가 나갔을 경우
+            if not r_name:
+                continue
+                
+            norm_name = normalize_name(r_name)
+            
+            if norm_name in player_map:
+                new_bases_objs[i] = player_map[norm_name]
+            elif norm_name == normalize_name(batter.character.name): # 타자가 나갔을 경우 (위에서 cover되지만 안전장치)
                 new_bases_objs[i] = batter
+            else:
+                # 매핑 실패! (심각한 오류)
+                print(f"🚨 [CRITICAL] Runner Name Mismatch: '{r_name}' not found in {[p.character.name for p in potential_runners]}")
+                # 일단 이름이 비슷하면 찾아보는 로직 추가 가능하지만, 지금은 로그만 남김
                 
         game.bases.basec1 = new_bases_objs[0]
         game.bases.basec2 = new_bases_objs[1]
@@ -728,29 +740,30 @@ app = workflow.compile()
 
 # --- Execution Entry ---
 def run_engine(
-    initial_game_state: GameState, 
-    director_ctx: DirectorContext = None,
-    home_manager_decision: ManagerDecision = None,
-    away_manager_decision: ManagerDecision = None,
+    game_state: GameState, 
+    db_session: Optional[Any] = None,
     on_step_callback=None
-):
+) -> GameState:
     """
     API에서 호출 가능한 시뮬레이션 엔진 진입점.
     initial_game_state: DB에서 로드/변환된 초기 게임 상태
     on_step_callback: 매 스텝(타석)이 끝날 때마다 호출되는 콜백 함수 (DB 저장용) func(game_state: GameState)
     """
-    print(f"--- Engine Triggered for Match {initial_game_state.match_id} ---")
+    print(f"--- Engine Triggered for Match {game_state.match_id} ---")
     
-    # Initialize Contexts if None
-    if director_ctx is None:
-        director_ctx = DirectorContext()
-    if home_manager_decision is None:
-        home_manager_decision = ManagerDecision(description="초기화", offense_strategy=TeamStrategy.NORMAL, defense_strategy=TeamStrategy.NORMAL)
-    if away_manager_decision is None:
-        away_manager_decision = ManagerDecision(description="초기화", offense_strategy=TeamStrategy.NORMAL, defense_strategy=TeamStrategy.NORMAL)
+    # [LOG DEBUG] 명확한 로그 구분을 위해 헤더 추가
+    with open("simulation_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"\n\n=== New Match (ID: {game_state.match_id}) Triggered at {os.environ.get('HOSTNAME', 'Local')} ===\n")
+
+    
+    # Initialize Contexts
+    director_ctx = DirectorContext()
+    home_manager_decision = ManagerDecision(description="초기화", offense_strategy=TeamStrategy.NORMAL, defense_strategy=TeamStrategy.NORMAL)
+    away_manager_decision = ManagerDecision(description="초기화", offense_strategy=TeamStrategy.NORMAL, defense_strategy=TeamStrategy.NORMAL)
 
     initial_state = {
-        "game": initial_game_state, 
+        "game": game_state, 
+        "db_session": db_session,
         "director_ctx": director_ctx,
         "home_manager_decision": home_manager_decision,
         "away_manager_decision": away_manager_decision,
@@ -774,8 +787,8 @@ def run_engine(
             step_count += 1
             
     print(f"--- Simulation Finished (Steps: {step_count}) ---")
-    print(f"Final Score: {initial_game_state.away_team.name} {initial_game_state.away_score} : {initial_game_state.home_score} {initial_game_state.home_team.name}")
-    return initial_game_state
+    print(f"Final Score: {game_state.away_team.name} {game_state.away_score} : {game_state.home_score} {game_state.home_team.name}")
+    return game_state
 
 def run_simulation_cli():
     """Local CLI Test Entry"""
