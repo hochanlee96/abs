@@ -1,8 +1,8 @@
 === Simulation Start ===
 
 
-=== New Match (ID: bf8bef4f-09af-4c42-b46d-913498ab4303) Triggered at Local ===
-[1회초] 황미숙이 슬라이더를 잘 쳐서 우익수 방향으로 안타를 기록하였습니다. (주자: 1루, 득점: 0)
+=== New Match (ID: c76ed322-5ab8-4fbe-91a7-5c896bc58e33) Triggered at Local ===
+[1회초] 타자 조민수가 김예진의 슬라이더를 처리하지 못하고 땅볼로 아웃됨. (주자: 없음, 득점: 0)
    (P: PitchType.SLIDER/PitchLocation.OUTSIDE, B: BattingStyle.AGGRESSIVE)
-[1회초] 이채원이 안타를 치고, 황미숙이 2루로 진루함. (주자: 1루,2루, 득점: 0)
-   (P: PitchType.FASTBALL/PitchLocation.OUTSIDE, B: BattingStyle.AGGRESSIVE)
+[1회초] 김순옥이 슬라이더를 잘 맞춰 안타를 기록하였다. (주자: 1루, 득점: 0)
+   (P: PitchType.SLIDER/PitchLocation.OUTSIDE, B: BattingStyle.AGGRESSIVE)

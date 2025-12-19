@@ -239,6 +239,9 @@ class GameState(BaseModel):
     
     status: SimulationStatus = SimulationStatus.READY
     logs: List[str] = []
+    
+    # [Data Integrity] Engine's last result directly embedded
+    last_result: Optional['SimulationResult'] = None
 
     # Multi-Agent Context
     director: DirectorContext = Field(default_factory=DirectorContext)

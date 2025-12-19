@@ -137,12 +137,13 @@ RESOLVER_PROMPT = """
 **[중요] 생각의 사슬 (Chain of Thought) 필수**
 결과를 내기 전에 `reasoning` 필드에 다음 단계로 생각을 정리하세요.
 1.  **Matchup Analysis**: 투수의 구위/제구 vs 타자의 컨택/파워 비교. 누가 이겼는가?
+    *   **[Game Balance]**: 야구의 **평균 타율은 0.250~0.280**입니다. 즉, 70%% 이상은 아웃되어야 합니다. 슈퍼스타도 3할대입니다. 타자에게 너무 후하지 않게 엄격히 판정하세요.
 2.  **Contact Physics**: 타격이 이겼다면, 공이 어디로, 얼마나 빠르게, 어떤 각도로 날아갔는가?
 3.  **Defense & Fielding**: 그 타구를 수비수가 잡을 수 있는가? (잡으면 아웃, 못 잡으면 안타)
 4.  **Runner Advancement (매우 중요)**:
     *   **안타(1B/2B/3B)**: 타자는 **반드시** 주자가 되어 루상에 나가야 합니다. (예: 1루타면 타자 이름을 1루에 배치)
-    *   타자가 나가면 기존 주자는 밀려나거나(Force), 추가 진루를 해야 합니다.
-    *   **아웃(Ground/Fly)**: 타자는 덕아웃으로 가고(주자 아님), 기존 주자는 상황에 따라 진루하거나 멈춥니다.
+    *   **주자 밀어내기(Push)**: 1루에 주자가 있는데 1루타가 나오면, 1루 주자는 2루로 가야 합니다. 2루 주자는 3루 또는 홈으로, 3루 주자는 홈으로 들어옵니다.
+    *   **타자 주자**: 타자도 주자 리스트에 포함되어야 함을 절대 잊지 마세요.
 5.  **Validation Feedback Check**: 이전 피드백을 반드시 반영하여 수정하세요.
 
 **[Output Format]**
@@ -152,11 +153,15 @@ RESOLVER_PROMPT = """
 *   **주의**: 타자 이름 `{batter_name}`을 결과 리스트의 적절한 위치에 꼭 넣으세요 (안타/볼넷 시).
 
 **[Few-shot Examples (정답 노트)]**
-*   **Case 1 (단타 시 주자 이동)**
+*   **Case 1 (단타 시 주자 이동 - 밀어내기)**
     *   상황: 주자 1루(Lee), 타자(Kim) 안타(우전 1루타)
     *   잘못된 결과: `final_bases`: `["Lee", null, null]` (타자 실종, 1루 중복 불가)
     *   **올바른 결과**: `final_bases`: `["Kim", "Lee", null]` (타자->1루, 1루주자->2루)
-*   **Case 2 (땅볼 아웃)**
+*   **Case 2 (득점 상황)**
+    *   상황: 주자 2루(Park), 3루(Choi), 타자(Han) 2루타
+    *   이동: 3루 주자(Choi) -> 홈(득점), 2루 주자(Park) -> 홈(득점), 타자(Han) -> 2루
+    *   **올바른 결과**: `final_bases`: `[null, "Han", null]`, `runs_scored`: 2
+*   **Case 3 (땅볼 아웃)**
     *   상황: 주자 없음, 내야 땅볼
     *   **올바른 결과**: `final_bases`: `[null, null, null]`
 
@@ -482,7 +487,10 @@ def update_state_node(state: SimState):
         if not res:
             print("Error: last_result is None")
             return {"game": game}
-            
+        
+        # [Data Integrity] Store the result in GameState for Runner to pick up
+        game.last_result = res
+        
         code = res.result_code
         
         batter = game.get_current_batter()

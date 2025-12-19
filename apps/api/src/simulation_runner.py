@@ -149,43 +149,22 @@ def run_match_background(match_id: int, db: Session):
         previous_state["away_score"] = updated_game.away_score
         previous_state["outs"] = updated_game.outs
 
-        # Construct SimulationResult (Inferred)
-        last_log_text = updated_game.logs[-1] if updated_game.logs else "Play happened."
-        
-        # Parse result code from log text
-        # Mock engine produces: "hits a HOMERUN", "is OUT", "hits a 1B", etc.
-        # Real engine produces Korean: "1루에 세이프", "아웃", "홈런", etc.
-        result_code = "GO" # Default to ground out
-        
-        text = last_log_text
-        if "HOMERUN" in text or "홈런" in text:
-            result_code = "HR"
-        elif "Strikeout" in text or "삼진" in text:
-            result_code = "SO"
-        elif "OUT" in text or "아웃" in text or "잡아냅니다" in text:
-            result_code = "OUT"
-        elif "1B" in text or "1루에 세이프" in text or "안타" in text:
-            result_code = "1B"
-        elif "2B" in text or "2루에 세이프" in text or "2루타" in text:
-            result_code = "2B"
-        elif "3B" in text or "3루에 세이프" in text or "3루타" in text:
-            result_code = "3B"
-        elif "BB" in text or "볼넷" in text or "4구" in text:
-            result_code = "BB"
-        
-        # Debug logging for bases
-        logger.info(f"Bases: {updated_game.bases}")
-
-        sim_result = {
-            "reasoning": "Inferred from state change",
-            "result_code": result_code,
-            "description": last_log_text,
-            "runners_advanced": False,
-            "final_bases": [None, None, None],
-            "runs_scored": runs_scored,
-            "pitch_desc": "",
-            "hit_desc": ""
-        }
+        # [Phase 3] Use Engine's Result Object
+        # No more text inference (which caused HIT vs OUT mismatch)
+        if updated_game.last_result:
+            sim_result = updated_game.last_result.model_dump() # Convert Pydantic to dict
+        else:
+            # Fallback (Should not happen)
+            sim_result = {
+                "reasoning": "Fallback (No Result)",
+                "result_code": "GO",
+                "description": last_log_text,
+                "runners_advanced": False,
+                "final_bases": [None, None, None],
+                "runs_scored": runs_scored,
+                "pitch_desc": "",
+                "hit_desc": ""
+            }
 
         # Construct BroadcastData
         # Need to map PlayerState to dict
