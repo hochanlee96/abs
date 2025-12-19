@@ -555,3 +555,37 @@
     font-size: 4rem;
   }
 }
+
+.errorBanner {
+  position: fixed;
+  top: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 1100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: slideDown 0.3s ease;
+  font-weight: 500;
+}
+
+@keyframes slideDown {
+  from {
+    top: -2rem;
+    opacity: 0;
+  }
+
+  to {
+    top: 2rem;
+    opacity: 1;
+  }
+}
+
+.errorIcon {
+  font-size: 1.2rem;
+}

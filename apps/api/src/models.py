@@ -87,6 +87,14 @@ class Character(Base):
     power: Mapped[int] = mapped_column(Integer, default=50)
     speed: Mapped[int] = mapped_column(Integer, default=50)
 
+    # Dynamic attributes for training/XP (not saved to DB)
+    contact_xp: int = 0
+    contact_xp_needed: int = 0
+    power_xp: int = 0
+    power_xp_needed: int = 0
+    speed_xp: int = 0
+    speed_xp_needed: int = 0
+
     # [Phase 2] Extended Stats
     mental: Mapped[int] = mapped_column(Integer, default=50)
     recovery: Mapped[int] = mapped_column(Integer, default=50)

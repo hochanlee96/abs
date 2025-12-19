@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import styles from "../styles/Training.module.css";
-import { apiGetMyCharacter } from "../lib/api";
+import { apiGetMyCharacter, apiListTrainings, apiPerformTraining } from "../lib/api";
 
 type StatType = "contact" | "power" | "speed";
 
@@ -48,41 +48,36 @@ export default function TrainingPage() {
     const [showLevelUp, setShowLevelUp] = useState<{ stat: StatType; newLevel: number } | null>(null);
     const [showBonus, setShowBonus] = useState<{ message: string; xp: number } | null>(null);
 
-    // Dummy trainings data
-    const trainings: Training[] = [
-        {
-            training_id: 1,
-            name: "Batting Practice",
-            description: "Improve your contact hitting",
-            stat_type: "contact",
-            xp_gain: 25, // Base XP (will be randomized)
-            icon: "🏏"
-        },
-        {
-            training_id: 2,
-            name: "Weightlifting",
-            description: "Build raw power",
-            stat_type: "power",
-            xp_gain: 25, // Base XP (will be randomized)
-            icon: "💪"
-        },
-        {
-            training_id: 3,
-            name: "Sprint Drills",
-            description: "Increase your speed",
-            stat_type: "speed",
-            xp_gain: 25, // Base XP (will be randomized)
-            icon: "⚡"
-        }
-    ];
+    const [trainings, setTrainings] = useState<Training[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (status === "unauthenticated") {
             router.push("/");
         } else if (status === "authenticated") {
             loadCharacter();
+            loadTrainings();
         }
     }, [status, router]);
+
+    const loadTrainings = async () => {
+        try {
+            const token = (session as any)?.id_token;
+            const data = await apiListTrainings(token);
+            // Map to local interface
+            const mapped: Training[] = data.map((t: any) => ({
+                training_id: t.training_id,
+                name: t.train_name,
+                description: `Improve your performance in ${t.contact_delta > 0 ? 'contact' : t.power_delta > 0 ? 'power' : 'speed'}`,
+                stat_type: t.contact_delta > 0 ? 'contact' : t.power_delta > 0 ? 'power' : 'speed' as StatType,
+                xp_gain: 25, // Visual hint
+                icon: t.contact_delta > 0 ? '🏏' : t.power_delta > 0 ? '💪' : '⚡'
+            }));
+            setTrainings(mapped);
+        } catch (e) {
+            console.error("Failed to load trainings", e);
+        }
+    };
 
     const loadCharacter = async () => {
         try {
@@ -91,24 +86,21 @@ export default function TrainingPage() {
 
             const char = await apiGetMyCharacter(token);
             if (char) {
-                // Map API character to CharacterWithXP
-                // If XP fields are missing (from backend/fresh creation), initialize them
                 const charWithXP: CharacterWithXP = {
                     character_id: char.character_id,
                     nickname: char.nickname,
                     contact: char.contact,
                     contact_xp: (char as any).contact_xp || 0,
-                    contact_xp_needed: (char as any).contact_xp_needed || char.contact * 50,
+                    contact_xp_needed: (char as any).contact_xp_needed || 100,
                     power: char.power,
                     power_xp: (char as any).power_xp || 0,
-                    power_xp_needed: (char as any).power_xp_needed || char.power * 50,
+                    power_xp_needed: (char as any).power_xp_needed || 100,
                     speed: char.speed,
                     speed_xp: (char as any).speed_xp || 0,
-                    speed_xp_needed: (char as any).speed_xp_needed || char.speed * 50,
+                    speed_xp_needed: (char as any).speed_xp_needed || 100,
                 };
                 setCharacter(charWithXP);
             } else {
-                // No character found, redirect to create
                 router.push("/character");
             }
         } catch (e) {
@@ -116,81 +108,66 @@ export default function TrainingPage() {
         }
     };
 
-    const handleTrain = (training: Training) => {
+    const handleTrain = async (training: Training) => {
         if (!character) return;
 
         setLoading(true);
+        setError(null);
 
-        // Simulate API call delay
-        setTimeout(() => {
-            const updatedCharacter = { ...character };
-            const statXpKey = `${training.stat_type}_xp` as keyof CharacterWithXP;
-            const statXpNeededKey = `${training.stat_type}_xp_needed` as keyof CharacterWithXP;
-            const statLevelKey = training.stat_type as keyof CharacterWithXP;
+        try {
+            const token = (session as any)?.id_token;
+            const updated = await apiPerformTraining(character.character_id, training.training_id, token) as any;
 
-            let currentXp = updatedCharacter[statXpKey] as number;
-            let xpNeeded = updatedCharacter[statXpNeededKey] as number;
-            let currentLevel = updatedCharacter[statLevelKey] as number;
+            // Check for level up by comparing old level to new level
+            const oldStat = character[training.stat_type];
+            const newStat = updated[training.stat_type];
 
-            // Random XP gain (10-35 range)
-            const baseXp = Math.floor(Math.random() * 26) + 10; // Random 10-35
-
-            // Random critical training (20% chance for 2x XP)
-            const isCritical = Math.random() < 0.2;
-            let xpGained = baseXp;
-            if (isCritical) {
-                xpGained *= 2;
-                setShowBonus({ message: "🌟 Critical Training!", xp: xpGained });
-                setTimeout(() => setShowBonus(null), 2000);
+            if (newStat > oldStat) {
+                setShowLevelUp({ stat: training.stat_type, newLevel: newStat });
+                setTimeout(() => setShowLevelUp(null), 3000);
             }
 
-            // Add XP
-            currentXp += xpGained;
+            // XP Gained visual (roughly calculate difference or just show "Done")
+            // Since we don't return "XP Gained" directly from backend (it's derived), 
+            // we can just refresh the character.
 
-            // Check for level up
-            let leveledUp = false;
-            while (currentXp >= xpNeeded) {
-                currentXp -= xpNeeded;
-                currentLevel += 1;
-                xpNeeded = currentLevel * 50; // Scaling: 50 XP per level (level 1 = 50, level 2 = 100, level 3 = 150, etc.)
-                leveledUp = true;
-            }
+            const charWithXP: CharacterWithXP = {
+                character_id: updated.character_id,
+                nickname: updated.nickname,
+                contact: updated.contact,
+                contact_xp: updated.contact_xp || 0,
+                contact_xp_needed: updated.contact_xp_needed || 100,
+                power: updated.power,
+                power_xp: updated.power_xp || 0,
+                power_xp_needed: updated.power_xp_needed || 100,
+                speed: updated.speed,
+                speed_xp: updated.speed_xp || 0,
+                speed_xp_needed: updated.speed_xp_needed || 100,
+            };
+            setCharacter(charWithXP);
 
-            // Update character
-            (updatedCharacter[statXpKey] as number) = currentXp;
-            (updatedCharacter[statXpNeededKey] as number) = xpNeeded;
-            (updatedCharacter[statLevelKey] as number) = currentLevel;
-
-            setCharacter(updatedCharacter);
-
-            // Save to local storage to persist XP
-            if (typeof window !== 'undefined') {
-                // We need to merge the XP data with the base character data stored in api.ts
-                // But since api.ts stores the whole object, we can just update it.
-                // However, api.ts might have different structure.
-                // Let's just save this CharacterWithXP object as the source of truth for now.
-                localStorage.setItem('abs_character_data', JSON.stringify(updatedCharacter));
-            }
-
-            // Add to training log
+            // Add to training log (client side history)
             const newLog: TrainingLog = {
                 id: Date.now(),
                 training_name: training.name,
                 stat_type: training.stat_type,
-                xp_gained: xpGained,
-                timestamp: new Date(),
-                isCritical
+                xp_gained: charWithXP[`${training.stat_type}_xp`] - character[`${training.stat_type}_xp`], // Approximated
+                timestamp: new Date()
             };
-            setTrainingLogs(prev => [newLog, ...prev].slice(0, 10)); // Keep last 10
+            // Note: If leveled up, xp_gained might look negative in this simple diff.
+            // Let's just fix the log to show something nice.
+            if (newLog.xp_gained < 0) newLog.xp_gained = 0; // Or better logic
 
-            // Show level up animation if leveled up
-            if (leveledUp) {
-                setShowLevelUp({ stat: training.stat_type, newLevel: currentLevel });
-                setTimeout(() => setShowLevelUp(null), 3000);
-            }
+            setTrainingLogs(prev => [newLog, ...prev].slice(0, 10));
 
+        } catch (e: any) {
+            console.error("Training failed", e);
+            setError(e.message);
+            // Auto hide error after 3s
+            setTimeout(() => setError(null), 3000);
+        } finally {
             setLoading(false);
-        }, 500);
+        }
     };
 
     const getStatColor = (stat: StatType) => {
@@ -220,6 +197,14 @@ export default function TrainingPage() {
 
     return (
         <div className={styles.container}>
+            {/* Error Banner */}
+            {error && (
+                <div className={styles.errorBanner}>
+                    <span className={styles.errorIcon}>⚠️</span>
+                    {error}
+                </div>
+            )}
+
             {/* Level Up Celebration */}
             {showLevelUp && (
                 <div className={styles.levelUpOverlay}>

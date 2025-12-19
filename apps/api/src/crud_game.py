@@ -98,11 +98,23 @@ def create_character(
     db.refresh(char)
     return char
 
+def _inject_xp_to_character(db: Session, character: Character) -> Character:
+    if not character:
+        return character
+    for stat in ["contact", "power", "speed"]:
+        current_val = getattr(character, stat)
+        xp_info = _derive_xp(db, character.character_id, stat, current_val)
+        setattr(character, f"{stat}_xp", xp_info[f"{stat}_xp"])
+        setattr(character, f"{stat}_xp_needed", xp_info[f"{stat}_xp_needed"])
+    return character
+
 def get_character(db: Session, character_id: int) -> Optional[Character]:
-    return db.execute(select(Character).where(Character.character_id == character_id)).scalar_one_or_none()
+    char = db.execute(select(Character).where(Character.character_id == character_id)).scalar_one_or_none()
+    return _inject_xp_to_character(db, char)
 
 def get_characters_by_account(db: Session, account_id: int) -> List[Character]:
-    return db.execute(select(Character).where(Character.owner_account_id == account_id).order_by(Character.character_id.desc())).scalars().all()
+    chars = db.execute(select(Character).where(Character.owner_account_id == account_id).order_by(Character.character_id.desc())).scalars().all()
+    return [_inject_xp_to_character(db, char) for char in chars]
 
 def get_teams_by_world(db: Session, world_id: int) -> List[Team]:
     return db.execute(select(Team).where(Team.world_id == world_id)).scalars().all()
@@ -196,6 +208,50 @@ def create_training(db: Session, train_name: str, contact_delta: int = 0, power_
     db.refresh(training)
     return training
 
+def _get_session_xp(session_id: int) -> int:
+    """
+    Deterministic random XP based on session ID.
+    Returns 25-50 XP.
+    """
+    import hashlib
+    h = hashlib.md5(str(session_id).encode()).hexdigest()
+    val = int(h[:4], 16)
+    return 25 + (val % 26)
+
+def _derive_xp(db: Session, character_id: int, stat_type: str, current_val: int) -> dict:
+    """
+    Back-Step Algorithm:
+    Calculates current XP progress by subtracting level costs from total history.
+    Cost for stat S -> S+1: 100 + (S * 20)
+    This allows scaling based on ACTUAL stats without changing the DB.
+    """
+    sessions = db.query(TrainingSession).join(Training).filter(
+        TrainingSession.character_id == character_id,
+        getattr(Training, f"{stat_type}_delta") > 0
+    ).all()
+    
+    total_xp = sum(_get_session_xp(s.training_session_id) for s in sessions)
+    
+    temp_total = total_xp
+    temp_val = current_val
+    
+    while temp_val > 0:
+        prev_cost = 100 + ((temp_val - 1) * 20)
+        if temp_total >= prev_cost:
+            temp_total -= prev_cost
+            temp_val -= 1
+        else:
+            break
+            
+    xp_in_level = temp_total
+    xp_needed_next = 100 + (current_val * 20)
+    
+    return {
+        f"{stat_type}_xp": xp_in_level,
+        f"{stat_type}_xp_needed": xp_needed_next,
+        f"{stat_type}_total_xp": total_xp
+    }
+
 def get_trainings(db: Session) -> List[Training]:
     return db.execute(select(Training)).scalars().all()
 
@@ -206,15 +262,34 @@ def perform_training(db: Session, character_id: int, training_id: int) -> Option
     if not character or not training:
         return None
 
+    # [Limit Logic] One training per finished match cycle
+    num_sessions = db.query(TrainingSession).filter(TrainingSession.character_id == character_id).count()
+    team_ids = [tp.team_id for tp in character.team_players]
+    
+    if team_ids:
+        num_finished_matches = db.query(Match).filter(
+            ((Match.home_team_id.in_(team_ids)) | (Match.away_team_id.in_(team_ids))),
+            Match.status == MatchStatus.FINISHED
+        ).count()
+    else:
+        num_finished_matches = 0
+        
+    if num_sessions > num_finished_matches:
+        raise ValueError("Training limit reached. Please complete a match before training again.")
+
     # Create session
     session = TrainingSession(character_id=character_id, training_id=training_id)
     db.add(session)
+    db.flush()
 
-    # Update stats
-    character.contact += training.contact_delta
-    character.power += training.power_delta
-    character.speed += training.speed_delta
+    # Threshold Logic
+    for stat in ["contact", "power", "speed"]:
+        if getattr(training, f"{stat}_delta") > 0:
+            current_val = getattr(character, stat)
+            xp_info = _derive_xp(db, character_id, stat, current_val)
+            if xp_info[f"{stat}_xp"] >= xp_info[f"{stat}_xp_needed"]:
+                setattr(character, stat, current_val + 1)
 
     db.commit()
     db.refresh(character)
-    return character
+    return _inject_xp_to_character(db, character)

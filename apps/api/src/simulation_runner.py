@@ -48,13 +48,30 @@ def run_match_background(match_id: int, db: Session):
     
     # Helper to convert Character -> sim_models.Character
     def to_sim_char(db_char: db_models.Character, role: sim_models.Role) -> sim_models.Character:
+        # Calculate Effective Stats (Base Stat + Fractional XP)
+        from . import crud_game
+        # Contact
+        c_xp = crud_game._derive_xp(db, db_char.character_id, "contact", db_char.contact)
+        eff_contact = db_char.contact + (c_xp["contact_xp"] / c_xp["contact_xp_needed"])
+        
+        # Power
+        p_xp = crud_game._derive_xp(db, db_char.character_id, "power", db_char.power)
+        eff_power = db_char.power + (p_xp["power_xp"] / p_xp["power_xp_needed"])
+        
+        # Speed
+        s_xp = crud_game._derive_xp(db, db_char.character_id, "speed", db_char.speed)
+        eff_speed = db_char.speed + (s_xp["speed_xp"] / s_xp["speed_xp_needed"])
+        
+        if db_char.is_user_created:
+            logger.info(f"[SIM BOOST] Character {db_char.nickname}: Contact {db_char.contact}->{eff_contact:.2f}, Power {db_char.power}->{eff_power:.2f}, Speed {db_char.speed}->{eff_speed:.2f}")
+
         return sim_models.Character(
             character_id=str(db_char.character_id),
             name=db_char.nickname,
             role=role,
-            contact=db_char.contact,
-            power=db_char.power,
-            speed=db_char.speed,
+            contact=eff_contact,
+            power=eff_power,
+            speed=eff_speed,
             # [Phase 2]
             mental=db_char.mental,
             stamina=db_char.stamina,
