@@ -18,6 +18,7 @@ from .models import (
     PitchType, PitchLocation, BattingStyle, Role, ValidatorResult
 )
 from .dummy_generator import init_dummy_game
+from .rule_engine import BaseballRuleEngine
 
 # Load Env
 load_dotenv()
@@ -137,33 +138,29 @@ RESOLVER_PROMPT = """
 **[중요] 생각의 사슬 (Chain of Thought) 필수**
 결과를 내기 전에 `reasoning` 필드에 다음 단계로 생각을 정리하세요.
 1.  **Matchup Analysis**: 투수의 구위/제구 vs 타자의 컨택/파워 비교. 누가 이겼는가?
-    *   **[Game Balance]**: 야구의 **평균 타율은 0.250~0.280**입니다. 즉, 70%% 이상은 아웃되어야 합니다. 슈퍼스타도 3할대입니다. 타자에게 너무 후하지 않게 엄격히 판정하세요.
-2.  **Contact Physics**: 타격이 이겼다면, 공이 어디로, 얼마나 빠르게, 어떤 각도로 날아갔는가?
+    *   **[Game Balance]**: 야구의 **평균 타율은 0.250~0.280**입니다. 70%%는 아웃되어야 합니다. 슈퍼스타도 3할대입니다.
+2.  **Contact Physics**: 타격이 이겼다면, 공이 어디로, 얼마나 빠르게, 어떤 각도로 날아갔는가? (Line Drive, Pop Fly, Grounder 등)
 3.  **Defense & Fielding**: 그 타구를 수비수가 잡을 수 있는가? (잡으면 아웃, 못 잡으면 안타)
-4.  **Runner Advancement (매우 중요)**:
-    *   **안타(1B/2B/3B)**: 타자는 **반드시** 주자가 되어 루상에 나가야 합니다. (예: 1루타면 타자 이름을 1루에 배치)
-    *   **주자 밀어내기(Push)**: 1루에 주자가 있는데 1루타가 나오면, 1루 주자는 2루로 가야 합니다. 2루 주자는 3루 또는 홈으로, 3루 주자는 홈으로 들어옵니다.
-    *   **타자 주자**: 타자도 주자 리스트에 포함되어야 함을 절대 잊지 마세요.
+4.  **Final Decision (Action)**: 안타인가? 아웃인가? 2루타인가? 홈런인가? (진루/득점은 절대 계산하지 마세요. 그것은 규칙 엔진이 합니다.)
 5.  **Validation Feedback Check**: 이전 피드백을 반드시 반영하여 수정하세요.
 
 **[Output Format]**
-*   `final_bases`: **반드시 3개의 요소**를 가진 리스트여야 합니다. `[1루주자이름, 2루주자이름, 3루주자이름]`.
-    *   주자가 없으면 `null` (Python: `None`).
-    *   예시: `["Kim Min-ji", null, "Lee Chul-su"]` (1루: 김민지, 2루: 없음, 3루: 이철수)
-*   **주의**: 타자 이름 `{batter_name}`을 결과 리스트의 적절한 위치에 꼭 넣으세요 (안타/볼넷 시).
+*   `result_code`: **명확한 야구 기록 코드**를 사용하세요.
+    *   `1B`, `2B`, `3B`, `HR` (안타)
+    *   `BB`, `IBB`, `HBP` (사사구)
+    *   `SO` (삼진), `GO` (땅볼), `FO` (플라이), `LO` (직선타), `E` (실책)
+*   `description`: 경기 내용을 생생하게 중계 멘트로 작성하세요.
 
 **[Few-shot Examples (정답 노트)]**
-*   **Case 1 (단타 시 주자 이동 - 밀어내기)**
-    *   상황: 주자 1루(Lee), 타자(Kim) 안타(우전 1루타)
-    *   잘못된 결과: `final_bases`: `["Lee", null, null]` (타자 실종, 1루 중복 불가)
-    *   **올바른 결과**: `final_bases`: `["Kim", "Lee", null]` (타자->1루, 1루주자->2루)
-*   **Case 2 (득점 상황)**
-    *   상황: 주자 2루(Park), 3루(Choi), 타자(Han) 2루타
-    *   이동: 3루 주자(Choi) -> 홈(득점), 2루 주자(Park) -> 홈(득점), 타자(Han) -> 2루
-    *   **올바른 결과**: `final_bases`: `[null, "Han", null]`, `runs_scored`: 2
-*   **Case 3 (땅볼 아웃)**
-    *   상황: 주자 없음, 내야 땅볼
-    *   **올바른 결과**: `final_bases`: `[null, null, null]`
+*   **Case 1 (단타)**
+    *   `result_code`: "1B"
+    *   `description`: "이정후가 투수 옆을 스치는 강한 타구로 중전 1루타를 만들어냅니다!"
+*   **Case 2 (삼진 아웃)**
+    *   `result_code`: "SO"
+    *   `description`: "바깥쪽 꽉 찬 직구에 방망이가 헛돌며 삼진 아웃!"
+*   **Case 3 (득점권 상황 2루타)**
+    *   `result_code`: "2B"
+    *   `description`: "좌중간을 완전히 가르는 타구! 타자 주자는 여유 있게 2루까지 들어갑니다."
 
 [입력 데이터]
 [환경] 날씨: {weather}, 바람: {wind}, 심판 존: {zone}
@@ -176,30 +173,27 @@ RESOLVER_PROMPT = """
 [검증 피드백 (이전 시도 실패 사유)]
 {validator_feedback}
 
-위 정보를 종합하여 결과를 JSON으로 출력하세요. `final_bases` 포맷(`[1B, 2B, 3B]`)을 절대 엄수하세요.
+위 정보를 종합하여 결과를 JSON으로 출력하세요.
 """
 
 
 VALIDATOR_PROMPT = """
-당신은 **야구 규칙 전문가(Baseball Rule Expert)**이자 **데이터 검증관**입니다.
-직전의 게임 상황과 시뮬레이션 결과(`SimulationResult`)를 비교하여 **논리적 오류**나 **규칙 위반**이 없는지 검증하세요.
+당신은 **야구 기록 검증관(Scorer)**입니다.
+시뮬레이션 결과가 논리적으로 타당한지 검증하세요. (주자 이동이나 점수 계산은 검증하지 않습니다. 오직 '판정 자체'만 봅니다.)
 
-**[필수 검증 항목 (Critical Check)]**
-1.  **Hit & Runner Logic**: 결과가 **안타(1B/2B/3B)** 또는 **볼넷(BB)**인데, `final_bases`에 **타자 이름이 없는가?** -> 무조건 **Invalid** (LogicError).
-    *   "안타를 쳤는데 주자가 없다"는 명백한 오류입니다. 타자는 루상에 있어야 합니다.
-2.  **Runner Continuity**: 주자가 갑자기 사라지거나(Out 없이), 1루에서 3루로 점프(2루타 이상 없이)했는가?
-3.  **Base Overlap**: 한 베이스에 이름이 두 개인가? (시스템상 리스트라 불가능하지만 논리적으로 체크)
-4.  **Score Mismatch**: `runs_scored` 점수와 실제로 홈에 들어온 주자 수가 일치하는가?
+**[필수 검증 항목]**
+1.  **Result Consistency**: `result_code`와 `description`이 일치하는가?
+    *   Code는 `GO`(땅볼)인데 설명은 "담장을 넘깁니다!"면 Invalid.
+2.  **Context Consistency**: 상황에 맞는 결과인가?
+    *   예: 투수가 `WALK` 상태가 아닌데 `BB`가 나오거나 하진 않는지(사실 이건 허용되지만, 터무니없는 상황 체크).
 
 [직전 상황]
 - 아웃: {outs}, 주자: {runners_before}
 
 [시뮬레이션 판정 결과]
 - 결과: {result_code} ({description})
-- 최종 주자 목록(final_bases): {final_bases}
-- 득점: {runs_scored}
 
-문제가 있다면 `is_valid: false`와 함께 `correction_suggestion`에 "타자 {batter_name}을 1루에 배치하세요" 처럼 구체적으로 지시하세요.
+문제가 있다면 `is_valid: false`와 `correction_suggestion`을 작성하세요. 문제 없으면 `is_valid: true`.
 """
 
 # --- Nodes ---
@@ -209,8 +203,6 @@ def director_node(state: SimState):
     game = state["game"]
     ctx = state.get("director_ctx", DirectorContext())
     
-    # 이닝 초반이거나 특정 상황에서만 환경 변화 (API 호출 절약 위해 간단한 로직 적용 가능)
-    # 여기서는 매 타석 체크한다고 가정 (환경이 급변하진 않으므로 temperature 0.3)
     prompt = ChatPromptTemplate.from_template(DIRECTOR_PROMPT)
     chain = prompt | llm.with_structured_output(DirectorContext)
     
@@ -224,7 +216,7 @@ def director_node(state: SimState):
     return {"director_ctx": new_ctx}
 
 def manager_node(state: SimState):
-    """양 팀 감독의 작전 지시 (병렬 처리 가능하지만 순차 처리함)"""
+    """양 팀 감독의 작전 지시"""
     import traceback
     try:
         game = state["game"]
@@ -236,7 +228,7 @@ def manager_node(state: SimState):
         runners = []
         if game.bases.basec1: runners.append("1루")
         if game.bases.basec2: runners.append("2루")
-        if game.bases.basec3: runners.append("3루") # Added missing 3rd base runner
+        if game.bases.basec3: runners.append("3루")
         runners_str = ",".join(runners) if runners else "없음"
         
         # Home Manager Context
@@ -253,8 +245,6 @@ def manager_node(state: SimState):
             "batter_name": game.get_current_batter().character.name,
             "batter_stats": game.get_current_batter().character.batter_stats,
             "opponent_name": game.get_current_pitcher().character.name,
-            
-            # Pitcher Info
             "current_pitcher_name": home_p.character.name,
             "pitch_count": home_p.pitch_count,
             "current_stamina": home_p.current_stamina,
@@ -275,8 +265,6 @@ def manager_node(state: SimState):
             "batter_name": game.get_current_batter().character.name,
             "batter_stats": game.get_current_batter().character.batter_stats,
             "opponent_name": game.get_current_pitcher().character.name,
-            
-            # Pitcher Info
             "current_pitcher_name": away_p.character.name,
             "pitch_count": away_p.pitch_count,
             "current_stamina": away_p.current_stamina,
@@ -300,7 +288,6 @@ def pitcher_node(state: SimState):
     pitcher = game.get_current_pitcher()
     batter = game.get_current_batter()
     
-    # 수비팀 감독의 작전 확인
     strategy = state["home_manager_decision"].defense_strategy if game.half == Half.TOP else state["away_manager_decision"].defense_strategy
     
     prompt = ChatPromptTemplate.from_template(PITCHER_PROMPT)
@@ -326,7 +313,6 @@ def batter_node(state: SimState):
     pitcher = game.get_current_pitcher()
     batter = game.get_current_batter()
     
-    # 공격팀 감독의 작전 확인
     strategy = state["away_manager_decision"].offense_strategy if game.half == Half.TOP else state["home_manager_decision"].offense_strategy
     
     prompt = ChatPromptTemplate.from_template(BATTER_PROMPT)
@@ -358,9 +344,6 @@ def resolver_node(state: SimState):
         p_dec = state["pitcher_decision"]
         b_dec = state["batter_decision"]
         
-        def_strategy = state["home_manager_decision"].defense_strategy if game.half == Half.TOP else state["away_manager_decision"].defense_strategy
-        off_strategy = state["away_manager_decision"].offense_strategy if game.half == Half.TOP else state["home_manager_decision"].offense_strategy
-        
         prompt = ChatPromptTemplate.from_template(RESOLVER_PROMPT)
         chain = prompt | llm.with_structured_output(SimulationResult)
         
@@ -369,19 +352,16 @@ def resolver_node(state: SimState):
             "runner_2": game.bases.basec2.character.name if game.bases.basec2 else "없음",
             "runner_3": game.bases.basec3.character.name if game.bases.basec3 else "없음"
         }
-        # --- 수비 라인업 정보 생성 ---
+        
         defense_team = game.get_defense_team()
         defense_info_lines = []
         for p in defense_team.roster:
             if p.character.role == Role.BATTER:
-                d_stats = p.character.batter_stats.get("defense", {"range":50, "error":50, "arm":50}) # 안전하게 get 사용
+                d_stats = p.character.batter_stats.get("defense", {"range":50, "error":50, "arm":50})
                 info = f"- {p.character.position_main} {p.character.name}: 범위 {d_stats['range']}, 실책 {d_stats['error']}, 어깨 {d_stats['arm']}"
                 defense_info_lines.append(info)
-            elif p.character.role == Role.PITCHER and p.character.name == pitcher.character.name:
-                 pass
         defense_lineup_str = "\n".join(defense_info_lines)
     
-        # 재시도인 경우 피드백 가져오기
         val_res = state.get("validator_result")
         feedback = ""
         if val_res and not val_res.is_valid:
@@ -396,7 +376,6 @@ def resolver_node(state: SimState):
             "outs": game.outs,
             "runners_status": runners_status,
             "defense_lineup": defense_lineup_str,
-            
             "pitcher_name": pitcher.character.name,
             "pitch_type": p_dec.pitch_type,
             "pitch_location": p_dec.location,
@@ -404,7 +383,6 @@ def resolver_node(state: SimState):
             "stuff": pitcher.character.pitcher_stats["stuff"],
             "control": pitcher.character.pitcher_stats["control"],
             "mental": pitcher.character.pitcher_stats.get("mental", 50),
-            
             "batter_name": batter.character.name,
             "aim_type": b_dec.aim_pitch_type,
             "aim_location": b_dec.aim_location,
@@ -413,7 +391,6 @@ def resolver_node(state: SimState):
             "speed": batter.character.batter_stats["speed"],
             "eye": batter.character.batter_stats.get("eye", 50),
             "clutch": batter.character.batter_stats.get("clutch", 50),
-            
             "validator_feedback": feedback
         })
         
@@ -432,10 +409,8 @@ def validator_node(state: SimState):
         res = state["last_result"]
         
         prompt = ChatPromptTemplate.from_template(VALIDATOR_PROMPT)
-        # Validator Chain (Using same LLM)
         validator_chain = prompt | llm.with_structured_output(ValidatorResult)
         
-        # Previous Runners String
         prev_runners = []
         if game.bases.basec1: prev_runners.append("1루")
         if game.bases.basec2: prev_runners.append("2루")
@@ -446,12 +421,9 @@ def validator_node(state: SimState):
             "outs": game.outs,
             "runners_before": prev_runners_str,
             "result_code": res.result_code,
-            "description": res.description,
-            "final_bases": str(res.final_bases),
-            "runs_scored": res.runs_scored
+            "description": res.description
         })
         
-        # Log Validation Result
         current_retry = state.get("retry_count", 0)
         
         if not val_res.is_valid:
@@ -460,26 +432,22 @@ def validator_node(state: SimState):
                 print(warn_msg)
                 with open("simulation_log.txt", "a", encoding="utf-8") as f:
                     f.write(warn_msg + "\n")
-                # Retry logic: state update only, routing is handled by conditional edge
                 return {"validator_result": val_res, "retry_count": current_retry + 1}
             else:
                 err_msg = f"❌ [Validation Failed] Max Retries Reached. Proceeding anyway. ({val_res.reasoning})"
                 print(err_msg)
                 with open("simulation_log.txt", "a", encoding="utf-8") as f:
                     f.write(err_msg + "\n")
-                return {"validator_result": val_res, "retry_count": 0} # Reset for next turn
+                return {"validator_result": val_res, "retry_count": 0}
         else:
-            # print(f"✅ Validation Passed: {val_res.reasoning}")
-            # Success -> Reset retry count
             return {"validator_result": val_res, "retry_count": 0}
         
     except Exception as e:
         print(f"Error in validator_node: {e}")
-        # 검증 실패해도 게임은 진행 (일단 Pass)
         return {"validator_result": None}
 
 def update_state_node(state: SimState):
-    """상태 업데이트 및 준비"""
+    """상태 업데이트 및 준비 (Agent-Environment Pattern)"""
     import traceback
     try:
         game = state["game"]
@@ -488,78 +456,28 @@ def update_state_node(state: SimState):
             print("Error: last_result is None")
             return {"game": game}
         
-        # [Data Integrity] Store the result in GameState for Runner to pick up
+        # [Data Integrity] Store the result
         game.last_result = res
         
-        code = res.result_code
+        # --- [Agent-Environment Transition] ---
+        # Agent has spoken (res.result_code). Now Environment reacts.
+        # Use Deterministic Rule Engine
+        runs_scored = BaseballRuleEngine.apply_result(game, res)
         
-        batter = game.get_current_batter()
-    
-        # --- Score Logic based on LLM ---
-        # LLM이 runs_scored를 직접 계산해서 줌
-        runs_scored = res.runs_scored
-        
-        # 득점 반영
-        if game.half == Half.TOP:
-            game.away_score += runs_scored
-        else:
-            game.home_score += runs_scored
-            
-        if "OUT" in code or code == "STRIKEOUT":
-            game.outs += 1
-    
-        # --- Base Update (Mapping LLM names to Objects) ---
-        # LLM returns names: ["Kim", "Lee", None]
-        # We need to find player objects from current lineups or runners
-        
-        # 현재 필드에 있는 주자들 + 타자 후보군
-        potential_runners = [game.bases.basec1, game.bases.basec2, game.bases.basec3, batter]
-        potential_runners = [r for r in potential_runners if r is not None]
-
-        # [DEBUG] 제거
-        
-        # 이름으로 매핑 (동명이인 처리 안됨 - 일단 이름 유니크 가정)
-        # LLM이 띄어쓰기나 대소문자를 틀릴 수 있으므로 정규화해서 매핑
-        def normalize_name(n):
-            return n.replace(" ", "").lower() if n else ""
-            
-        player_map = {normalize_name(p.character.name): p for p in potential_runners}
-        
-        new_bases_objs = [None, None, None]
-        
-        for i, r_name in enumerate(res.final_bases):
-            if not r_name:
-                continue
-                
-            norm_name = normalize_name(r_name)
-            
-            if norm_name in player_map:
-                new_bases_objs[i] = player_map[norm_name]
-            elif norm_name == normalize_name(batter.character.name): # 타자가 나갔을 경우 (위에서 cover되지만 안전장치)
-                new_bases_objs[i] = batter
-            else:
-                # 매핑 실패! (심각한 오류)
-                print(f"🚨 [CRITICAL] Runner Name Mismatch: '{r_name}' not found in {[p.character.name for p in potential_runners]}")
-                # 일단 이름이 비슷하면 찾아보는 로직 추가 가능하지만, 지금은 로그만 남김
-                
-        game.bases.basec1 = new_bases_objs[0]
-        game.bases.basec2 = new_bases_objs[1]
-        game.bases.basec3 = new_bases_objs[2]
-    
         # Log (Console)
         log_entry = f"[{game.inning}회{'초' if game.half==Half.TOP else '말'}] {res.description}"
-        # 주자/점수 상황 추가 로깅
+        
+        # 주자/점수 상황 로깅
         runners_log = []
-        if game.bases.basec1: runners_log.append("1루")
-        if game.bases.basec2: runners_log.append("2루")
-        if game.bases.basec3: runners_log.append("3루")
-        runners_str = ",".join(runners_log) if runners_log else "없음"
+        if game.bases.basec1: runners_log.append("1루: " + game.bases.basec1.character.name)
+        if game.bases.basec2: runners_log.append("2루: " + game.bases.basec2.character.name)
+        if game.bases.basec3: runners_log.append("3루: " + game.bases.basec3.character.name)
+        runners_str = ", ".join(runners_log) if runners_log else "없음"
         
         log_entry += f" (주자: {runners_str}, 득점: {runs_scored})"
         game.logs.append(log_entry)
         
         # --- Data Logging (File) ---
-        # 1. Text Log
         p_dec = state.get('pitcher_decision')
         b_dec = state.get('batter_decision')
         
@@ -569,7 +487,6 @@ def update_state_node(state: SimState):
                 f.write(f"   (P: {p_dec.pitch_type}/{p_dec.location}, B: {b_dec.style})\n")
     
         # 2. JSON Data Log (Frontend Interface)
-        # create BroadcastData
         pitcher = game.get_current_pitcher()
         batter = game.get_current_batter()
         next_batter_info = game.get_next_batter_info()
@@ -614,17 +531,15 @@ def update_state_node(state: SimState):
         # Prepare Next Batter
         game.next_batter()
         
-        # --- [Phase 2] Pitcher Mechanics & Substitution ---
-        # 1. Update Pitch Count & Stamina
+        # --- Pitcher Mechanics & Substitution ---
         current_pitcher = game.get_current_pitcher()
         if current_pitcher and p_dec:
             current_pitcher.pitch_count += 1
-            stamina_cost = 1 # [TEST] 체력 급격히 감소
+            stamina_cost = 1
             if p_dec.effort == "Full_Power":
                 stamina_cost = 3
             current_pitcher.current_stamina = max(0, current_pitcher.current_stamina - stamina_cost)
             
-        # 2. Substitution Check
         defense_manager_dec = state["home_manager_decision"] if game.half == Half.TOP else state["away_manager_decision"]
         
         if defense_manager_dec.change_pitcher:
@@ -693,10 +608,6 @@ def route_validator(state: SimState):
     val_res = state.get("validator_result")
     retry_count = state.get("retry_count", 0)
     
-    # 마지막 시도가 실패했고, 아직 재시도 횟수가 카운트된 상태라면(즉 리셋 안됨)
-    # validator_node에서 이미 max check를 해서 0으로 리셋했으면 continue임.
-    # validator_node에서 current_retry + 1을 리턴했으면 재시도임.
-    
     if val_res and not val_res.is_valid and retry_count > 0:
         return "retry"
     return "continue"
@@ -710,7 +621,7 @@ workflow.add_node("manager", manager_node)
 workflow.add_node("pitcher", pitcher_node)
 workflow.add_node("batter", batter_node)
 workflow.add_node("resolver", resolver_node)
-workflow.add_node("validator", validator_node) # Added Validator
+workflow.add_node("validator", validator_node)
 workflow.add_node("update_state", update_state_node)
 workflow.add_node("check_inning", check_inning_node)
 
@@ -720,9 +631,7 @@ workflow.add_edge("director", "manager")
 workflow.add_edge("manager", "pitcher")
 workflow.add_edge("pitcher", "batter")
 workflow.add_edge("batter", "resolver")
-workflow.add_edge("resolver", "validator") # Resolver -> Validator
-# validator -> update_state (Conditional)
-
+workflow.add_edge("resolver", "validator")
 workflow.add_conditional_edges(
     "validator",
     route_validator,
@@ -731,14 +640,12 @@ workflow.add_conditional_edges(
         "continue": "update_state"
     }
 )
-
 workflow.add_edge("update_state", "check_inning")
-
 workflow.add_conditional_edges(
     "check_inning",
     check_game_end_condition,
     {
-        "continue": "director", # 다음 타석 시작 시 다시 환경부터 체크 (혹은 manager부터 해도 됨)
+        "continue": "director",
         "end": END
     }
 )
@@ -754,12 +661,9 @@ def run_engine(
 ) -> GameState:
     """
     API에서 호출 가능한 시뮬레이션 엔진 진입점.
-    initial_game_state: DB에서 로드/변환된 초기 게임 상태
-    on_step_callback: 매 스텝(타석)이 끝날 때마다 호출되는 콜백 함수 (DB 저장용) func(game_state: GameState)
     """
     print(f"--- Engine Triggered for Match {game_state.match_id} ---")
     
-    # [LOG DEBUG] 명확한 로그 구분을 위해 헤더 추가
     with open("simulation_log.txt", "a", encoding="utf-8") as f:
         f.write(f"\n\n=== New Match (ID: {game_state.match_id}) Triggered at {os.environ.get('HOSTNAME', 'Local')} ===\n")
 
@@ -785,9 +689,6 @@ def run_engine(
     # Run Graph
     step_count = 0
     for s in app.stream(initial_state, config={"recursion_limit": 1000}):
-        # s is a dict of updated state keys
-        
-        # 'update_state' 노드가 실행된 직후에 DB 저장 등 콜백 호출
         if "update_state" in s:
             updated_game = s["update_state"]["game"]
             if on_step_callback:
@@ -797,26 +698,3 @@ def run_engine(
     print(f"--- Simulation Finished (Steps: {step_count}) ---")
     print(f"Final Score: {game_state.away_team.name} {game_state.away_score} : {game_state.home_score} {game_state.home_team.name}")
     return game_state
-
-def run_simulation_cli():
-    """Local CLI Test Entry"""
-    print("--- Multi-Agent Engine Start (CLI) ---")
-    # Clear Logs
-    with open("simulation_log.txt", "w", encoding="utf-8") as f:
-        f.write("=== Simulation Start ===\n")
-    with open("broadcast_data.jsonl", "w", encoding="utf-8") as f:
-        pass
-
-    game = init_dummy_game()
-    # Call run_engine without callback for CLI
-    run_engine(game)
-
-if __name__ == "__main__":
-    import traceback
-    try:
-        run_simulation_cli()
-    except Exception as e:
-        err_msg = traceback.format_exc()
-        with open("error_log.txt", "w", encoding="utf-8") as f:
-            f.write(err_msg)
-        print(f"CRITICAL ERROR in Main Loop: {e}")

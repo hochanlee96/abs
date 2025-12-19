@@ -153,6 +153,14 @@ def run_match_background(match_id: int, db: Session):
         # No more text inference (which caused HIT vs OUT mismatch)
         if updated_game.last_result:
             sim_result = updated_game.last_result.model_dump() # Convert Pydantic to dict
+            
+            # [Frontend Compatibility] Inject params that were removed from Model but might be needed by FE
+            sim_result["runs_scored"] = runs_scored
+            sim_result["final_bases"] = [
+                updated_game.bases.basec1.character.name if updated_game.bases.basec1 else None,
+                updated_game.bases.basec2.character.name if updated_game.bases.basec2 else None,
+                updated_game.bases.basec3.character.name if updated_game.bases.basec3 else None
+            ]
         else:
             # Fallback (Should not happen)
             sim_result = {

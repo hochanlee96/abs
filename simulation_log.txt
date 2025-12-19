@@ -6,3 +6,10 @@
    (P: PitchType.SLIDER/PitchLocation.OUTSIDE, B: BattingStyle.AGGRESSIVE)
 [1회초] 김순옥이 슬라이더를 잘 맞춰 안타를 기록하였다. (주자: 1루, 득점: 0)
    (P: PitchType.SLIDER/PitchLocation.OUTSIDE, B: BattingStyle.AGGRESSIVE)
+
+
+=== New Match (ID: test_match_001) Triggered at Local ===
+[1회초] 이경자가 심명자의 빠른 패스트볼을 공략하지만, 공은 강한 땅볼로 나갑니다. 수비수들이 반응했고, 아쉽게도 아웃이 되어버립니다! (주자: 없음, 득점: 0)
+   (P: PitchType.FASTBALL/PitchLocation.OUTSIDE, B: BattingStyle.AGGRESSIVE)
+[1회초] 이정남이 중간으로 날아오는 패스트볼을 강하게 쳐내며, 공은 빠르게 중전으로 떨어집니다! 안타로 이어집니다! (주자: 1루: 이정남, 득점: 0)
+   (P: PitchType.FASTBALL/PitchLocation.OUTSIDE, B: BattingStyle.AGGRESSIVE)
