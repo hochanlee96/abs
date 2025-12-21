@@ -12,6 +12,17 @@ def verify_google_id_token_from_header(authorization: str | None) -> dict:
         raise HTTPException(status_code=401, detail="Missing Bearer token")
 
     token = authorization.split(" ", 1)[1].strip()
+    
+    # [DEV] Bypass for local testing
+    if token == "test-token":
+        print("[DEBUG] Using Dev Test Token bypass")
+        return {
+            "sub": "test-user-id",
+            "email": "test@example.com",
+            "name": "Test User",
+            "picture": ""
+        }
+
     try:
         payload = id_token.verify_oauth2_token(token, grequests.Request(), GOOGLE_CLIENT_ID)
         return payload

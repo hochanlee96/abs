@@ -24,7 +24,7 @@ from .rule_engine import BaseballRuleEngine
 load_dotenv()
 
 # --- LLM Setup ---
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.5)
 
 # --- State for Graph ---
 class SimState(TypedDict):
@@ -132,60 +132,65 @@ BATTER_PROMPT = """
 """
 
 RESOLVER_PROMPT = """
-당신은 고도로 훈련된 **야구 시뮬레이션 심판(Umpire)이자 물리 엔진**입니다.
-주어진 데이터(선수 능력, 상황, 작전)와 **직전 검증 실패 피드백**를 분석하여 **가장 현실적이고 개연성 있는 경기 결과**를 도출하세요.
+당신은 **프로야구 시뮬레이션 전문 판정단(Professional Umpire)**입니다.
+주어진 데이터(선수 능력, 상황, 작전)와 **직전 검증 실패 피드백**를 분석하여 **가장 현실적인 경기 결과**를 도출하세요.
 
-**[중요] 생각의 사슬 (Chain of Thought) 필수**
-결과를 내기 전에 `reasoning` 필드에 다음 단계로 생각을 정리하세요.
-1.  **Matchup Analysis**: 투수의 구위/제구 vs 타자의 컨택/파워 비교. 누가 이겼는가?
-    *   **[Game Balance]**: 야구의 **평균 타율은 0.250~0.280**입니다. 70%%는 아웃되어야 합니다. 슈퍼스타도 3할대입니다.
-2.  **Contact Physics**: 타격이 이겼다면, 공이 어디로, 얼마나 빠르게, 어떤 각도로 날아갔는가? (Line Drive, Pop Fly, Grounder 등)
-3.  **Defense & Fielding**: 그 타구를 수비수가 잡을 수 있는가? (잡으면 아웃, 못 잡으면 안타)
-4.  **Final Decision (Action)**: 안타인가? 아웃인가? 2루타인가? 홈런인가? (진루/득점은 절대 계산하지 마세요. 그것은 규칙 엔진이 합니다.)
-5.  **Validation Feedback Check**: 이전 피드백을 반드시 반영하여 수정하세요.
+**[핵심 원칙: 리얼리즘과 밸런스]**
+1.  **Independent Event (독립 시행)**: 이전 타자의 결과가 이번 타석에 영향을 주지 않습니다. (연속 안타 보정 없음) **매 타석을 제로 베이스에서 판단하세요.**
+2.  **Target Stats (목표 통계)**:
+    *   리그 평균 타율은 **0.260 ~ 0.280**입니다. (10번 중 7번 이상은 아웃)
+    *   하지만 **무조건적인 아웃은 지양**하세요. 스탯에 근거한 결과를 내세요.
+3.  **Weighted Probability (승부 예측)**:
+    *   **Fatigue Check**: 투구 수가 80개 이상이거나 체력이 30 이하인가요? 그렇다면 **실투(Mistake)** 확률을 대폭 높이세요. (안타 확률 +20%)
+    *   **투수 우위 (Stuff > Contact)**: 아웃 확률 70~80% (땅볼, 삼진 유력).
+    *   **타자 우위 (Contact > Stuff)**: 안타 확률 35~45% (안타, 2루타 가능성).
+    *   **비슷한 스탯**: 약 25~30% 확률로 안타.
+
+**[다양성(Diversity) 가이드]**
+*   **1루타(1B) 남발 주의**: 타자의 파워(Power)가 70 이상이면 2루타(2B), 홈런(HR) 확률을 높이세요.
+*   **아웃 다양화**: 내야 땅볼(GO), 외야 뜬공(FO), 삼진(SO), 직선타(LO)를 골고루 섞으세요.
+
+**[생각의 사슬 (Reasoning Steps)]**
+1.  **Matchup Analysis**: 투수 vs 타자 스탯 비교. 누가 더 유리한가?
+2.  **Probability Logic**: 유리한 쪽이 이길 확률을 70% 정도로 잡고 주사위를 굴리세요. (절대적인 승리는 없습니다)
+3.  **Narrative Creation**: 결과를 먼저 정하고(`result_code`), 그에 맞는 멋진 묘사(`description`)를 붙이세요.
 
 **[Output Format]**
-*   `result_code`: **명확한 야구 기록 코드**를 사용하세요.
-    *   `1B`, `2B`, `3B`, `HR` (안타)
-    *   `BB`, `IBB`, `HBP` (사사구)
-    *   `SO` (삼진), `GO` (땅볼), `FO` (플라이), `LO` (직선타), `E` (실책)
-*   `description`: 경기 내용을 생생하게 중계 멘트로 작성하세요.
+*   `result_code`: `1B`, `2B`, `3B`, `HR`, `BB`, `SO`, `GO`, `FO`, `LO`, `E`.
+*   `description`: **생생하고 전문적인 중계 톤**으로 작성하세요.
 
-**[Few-shot Examples (정답 노트)]**
-*   **Case 1 (단타)**
-    *   `result_code`: "1B"
-    *   `description`: "이정후가 투수 옆을 스치는 강한 타구로 중전 1루타를 만들어냅니다!"
-*   **Case 2 (삼진 아웃)**
-    *   `result_code`: "SO"
-    *   `description`: "바깥쪽 꽉 찬 직구에 방망이가 헛돌며 삼진 아웃!"
-*   **Case 3 (득점권 상황 2루타)**
-    *   `result_code`: "2B"
-    *   `description`: "좌중간을 완전히 가르는 타구! 타자 주자는 여유 있게 2루까지 들어갑니다."
+**[Few-shot Examples]**
+*   (SO) "몸쪽 꽉 찬 직구! 타자, 꼼짝 못 하고 루킹 삼진 아웃."
+*   (1B) "유격수 키를 살짝 넘기는 빗맞은 안타. 행운이 따릅니다."
+*   (2B) "우중간을 완전히 가르는 타구! 타자 주자 여유 있게 2루 도착."
+*   (GO) "잘 맞은 타구였지만 2루수 정면으로 향합니다. 4-6-3 병살타 코스."
 
 [입력 데이터]
 [환경] 날씨: {weather}, 바람: {wind}, 심판 존: {zone}
 [상황] 아웃: {outs}, {runners_status}
 [수비] {defense_lineup}
 
-[투수 {pitcher_name}] {pitch_type}({pitch_location}) | 구속 {velocity}, 구위 {stuff}, 제구 {control}, 멘탈 {mental}
+[투수 {pitcher_name}] {pitch_type}({pitch_location}) | 구속 {velocity}, 구위 {stuff}, 제구 {control}, 멘탈 {mental} | 투구수: {pitch_count}, 체력: {stamina}
 [타자 {batter_name}] 노림수 {aim_type}, 코스 {aim_location} | 컨택 {contact}, 파워 {power}, 스피드 {speed}
 
-[검증 피드백 (이전 시도 실패 사유)]
+[검증 피드백]
 {validator_feedback}
 
-위 정보를 종합하여 결과를 JSON으로 출력하세요.
+위 정보를 바탕으로 **치우치지 않은 현실적인 야구**를 보여주세요.
 """
 
 
 VALIDATOR_PROMPT = """
 당신은 **야구 기록 검증관(Scorer)**입니다.
-시뮬레이션 결과가 논리적으로 타당한지 검증하세요. (주자 이동이나 점수 계산은 검증하지 않습니다. 오직 '판정 자체'만 봅니다.)
+시뮬레이션 결과가 논리적으로 타당한지 검증하세요.
 
-**[필수 검증 항목]**
-1.  **Result Consistency**: `result_code`와 `description`이 일치하는가?
-    *   Code는 `GO`(땅볼)인데 설명은 "담장을 넘깁니다!"면 Invalid.
-2.  **Context Consistency**: 상황에 맞는 결과인가?
-    *   예: 투수가 `WALK` 상태가 아닌데 `BB`가 나오거나 하진 않는지(사실 이건 허용되지만, 터무니없는 상황 체크).
+**[검증 기준: 매우 관대하게(Lenient)]**
+*   **핵심 불일치만 잡으세요.** 사소한 묘사 차이나 주자 이동에 대한 언급은 무시하세요.
+*   **Result Consistency**: `result_code`와 `description`이 **정면으로 모순**될 때만 Invalid.
+    *   (O) Code: `1B`, Desc: "안타성 타구! 1루에 나갑니다."
+    *   (O) Code: `1B`, Desc: "우익수 앞에 떨어지는 안타! 주자들은 한 베이스씩 진룹니다." (주자 진루 언급 OK)
+    *   (X) Code: `GO`(땅볼), Desc: "담장을 넘어가는 홈런입니다!" (정면 모순 -> Invalid)
+    *   (X) Code: `SO`(삼진), Desc: "방망이에 맞고 안타가 됩니다." (정면 모순 -> Invalid)
 
 [직전 상황]
 - 아웃: {outs}, 주자: {runners_before}
@@ -193,7 +198,7 @@ VALIDATOR_PROMPT = """
 [시뮬레이션 판정 결과]
 - 결과: {result_code} ({description})
 
-문제가 있다면 `is_valid: false`와 `correction_suggestion`을 작성하세요. 문제 없으면 `is_valid: true`.
+**치명적인 오류**가 아니면 무조건 `is_valid: true`를 주세요.
 """
 
 # --- Nodes ---
@@ -383,6 +388,8 @@ def resolver_node(state: SimState):
             "stuff": pitcher.character.pitcher_stats["stuff"],
             "control": pitcher.character.pitcher_stats["control"],
             "mental": pitcher.character.pitcher_stats.get("mental", 50),
+            "pitch_count": pitcher.pitch_count,
+            "stamina": pitcher.current_stamina,
             "batter_name": batter.character.name,
             "aim_type": b_dec.aim_pitch_type,
             "aim_location": b_dec.aim_location,
@@ -688,7 +695,7 @@ def run_engine(
     
     # Run Graph
     step_count = 0
-    for s in app.stream(initial_state, config={"recursion_limit": 1000}):
+    for s in app.stream(initial_state, config={"recursion_limit": 5000}):
         if "update_state" in s:
             updated_game = s["update_state"]["game"]
             if on_step_callback:

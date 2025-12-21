@@ -23,16 +23,15 @@ class InningHalf(str, PyEnum):
     BOTTOM = "BOTTOM"
 
 class ResultCode(str, PyEnum):
-    STRIKEOUT = "STRIKEOUT"
-    WALK = "WALK"
-    SINGLE = "SINGLE"
-    DOUBLE = "DOUBLE"
-    TRIPLE = "TRIPLE"
+    STRIKEOUT = "SO"
+    WALK = "BB"
+    HIT_BY_PITCH = "HBP"
+    SINGLE = "1B"
+    DOUBLE = "2B"
+    TRIPLE = "3B"
     HOMERUN = "HOMERUN"
-    OUT = "OUT"
-    # Added for completeness if needed
-    FLY_OUT = "FLY_OUT"
-    GROUND_OUT = "GROUND_OUT"
+    FLY_OUT = "FO"
+    GROUND_OUT = "GO"
 
 class Account(Base):
     __tablename__ = "accounts"
@@ -115,6 +114,16 @@ class Character(Base):
     position_main: Mapped[str] = mapped_column(String(20), default="DH")
     position_sub: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
+    # [Phase 3] Season Stats (Accumulated)
+    games_played: Mapped[int] = mapped_column(Integer, default=0)
+    at_bats: Mapped[int] = mapped_column(Integer, default=0)
+    hits: Mapped[int] = mapped_column(Integer, default=0)
+    homeruns: Mapped[int] = mapped_column(Integer, default=0)
+    rbis: Mapped[int] = mapped_column(Integer, default=0)
+    runs: Mapped[int] = mapped_column(Integer, default=0)
+    walks: Mapped[int] = mapped_column(Integer, default=0)
+    strikeouts: Mapped[int] = mapped_column(Integer, default=0)
+
     world: Mapped["World"] = relationship(back_populates="characters")
     owner: Mapped[Optional["Account"]] = relationship(back_populates="characters")
     team_players: Mapped[List["TeamPlayer"]] = relationship(back_populates="character")
@@ -162,6 +171,9 @@ class PlateAppearance(Base):
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     batter_character_id: Mapped[int] = mapped_column(ForeignKey("characters.character_id"), nullable=False)
     result_code: Mapped[Optional[ResultCode]] = mapped_column(Enum(ResultCode), nullable=True)
+    runs_scored: Mapped[int] = mapped_column(Integer, default=0)
+    rbi: Mapped[int] = mapped_column(Integer, default=0)
+    outs_added: Mapped[int] = mapped_column(Integer, default=0)
 
     match: Mapped["Match"] = relationship(back_populates="plate_appearances")
     batter: Mapped["Character"] = relationship(back_populates="plate_appearances")

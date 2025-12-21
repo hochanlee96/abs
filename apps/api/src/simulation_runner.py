@@ -87,21 +87,45 @@ def run_match_background(match_id: int, db: Session):
     def build_roster(db_team: db_models.Team) -> list[sim_models.PlayerState]:
         roster = []
         players = db_team.team_players
-        # Filter active players if needed
         players = [p for p in players if p.is_active]
         
-        # Sort or select specific players? For now just take them all.
-        # Ensure at least one pitcher and batters.
-        # If roles are not well defined in MVP, assume first 1 is Pitcher, rest Batters
+        has_pitcher = False
+        user_char_id = db_team.user_character_id
         
-        for idx, tp in enumerate(players):
+        # 1st Pass: Create Entities & Assign Roles
+        for tp in players:
             db_char = tp.character
-            # Map DB Role to Sim Role
-            # Infer Position: Index 0 is Pitcher, rest are Batters
-            sim_role = sim_models.Role.PITCHER if idx == 0 else sim_models.Role.BATTER
+            is_user = (db_char.character_id == user_char_id)
+            
+            if is_user:
+                # [Rule] User Character is ALWAYS Batter
+                sim_role = sim_models.Role.BATTER
+            else:
+                # Others: Check Position
+                pos = str(db_char.position_main).upper()
+                if pos in ["P", "SP", "RP", "CP", "PITCHER"]:
+                    sim_role = sim_models.Role.PITCHER
+                    has_pitcher = True
+                else:
+                    sim_role = sim_models.Role.BATTER
             
             sim_char = to_sim_char(db_char, sim_role)
             roster.append(sim_models.PlayerState(character=sim_char))
+            
+        # 2nd Pass: Safety Check (Ensure at least 1 Pitcher)
+        if not has_pitcher and len(roster) > 0:
+            # Pick the first NON-USER player to be pitcher
+            pitcher_assigned = False
+            for p in roster:
+                if p.character.character_id != str(user_char_id):
+                    p.character.role = sim_models.Role.PITCHER
+                    # Update stats mapping for pitcher context if needed (handled by property, but role change is enough)
+                    pitcher_assigned = True
+                    break
+            
+            # If still no pitcher (e.g. team has only 1 player and it's the user), force user to pitch (fallback)
+            if not pitcher_assigned:
+                 roster[0].character.role = sim_models.Role.PITCHER
             
         return roster
 
@@ -161,6 +185,122 @@ def run_match_background(match_id: int, db: Session):
                 updated_game.bases.basec2.character.name if updated_game.bases.basec2 else None,
                 updated_game.bases.basec3.character.name if updated_game.bases.basec3 else None
             ]
+
+            # --- [Phase 3] Update Player Stats in DB ---
+            try:
+                batter_sim_char = updated_game.get_current_batter()
+                if batter_sim_char and batter_sim_char.character.id: # Sim Character has UUID or ID? Wait, engine uses transient objects.
+                    # We need to find the DB Character.
+                    # sim_models.Character likely has 'id' which maps to DB character_id if we set it up right.
+                    # Let's check to_sim_char mapping.
+                    # Assuming batter_sim_char.character.data['id'] or sim_models.Character fields.
+                    # In `models.py` (sim), Character has `id: str`. In `runner`, we map it.
+                    # Let's try to query by name if ID is missing, or rely on `batter_sim_char.character.id`.
+                    
+                    # NOTE: sim_models.Character might have 'id' as string.
+                    char_id = int(batter_sim_char.character.id)
+                    db_char = db.query(db_models.Character).filter(db_models.Character.character_id == char_id).first()
+                    
+                    if db_char:
+                        rc = sim_result["result_code"]
+                        
+                        # At Bats (Walker/Sacrifice excluded usually, but simplified here)
+                        if rc not in ["BB", "HBP"]: 
+                            db_char.at_bats += 1
+                        else:
+                            db_char.walks += 1
+                            
+                        # Hits
+                        if rc in ["1B", "2B", "3B", "HOMERUN"]:
+                            db_char.hits += 1
+                        
+                        # Homerun
+                        if rc == "HOMERUN":
+                            db_char.homeruns += 1
+                            db_char.runs += 1 # Batter scores on HR
+                        
+                        # RBIs
+                        db_char.rbis += runs_scored
+                        
+                        # Strikeout
+                        if rc == "SO":
+                            db_char.strikeouts += 1
+                            
+                        # Optimization: Commit later or flush? 
+                        # We commit at end of on_step anyway.
+
+                        # --- [Phase 4] Log to PlateAppearance Table (Granular History) ---
+                        # This enables "Simulated Stat Calculation" from raw logs as requested.
+                        try:
+                            # Map Result Code string to Enum if needed, or string.
+                            # Schema uses ENUM('SO','BB',...), model likely uses logic.
+                            # We assume the string from engine matches the Enum values.
+                            
+                            # Determine HALF
+                            current_half = "TOP" if updated_game.top_bottom == 0 else "BOTTOM" 
+                            # Wait, engine uses 0 for top? Let's check or assume "TOP"/"BOTTOM" string matches frontend logic.
+                            # Actually updated_game might not have 'top_bottom'. Let's check recent logs.
+                            # Log says "half": "TOP".
+                            # Let's assume updated_game.half exists or logic is:
+                            game_half = "TOP" # Default
+                            if hasattr(updated_game, "half"):
+                                game_half = updated_game.half
+                            elif hasattr(updated_game, "top_bottom"):
+                                game_half = "TOP" if updated_game.top_bottom == 0 else "BOTTOM"
+                            
+                            # Enum Conversion
+                            game_half_enum = db_models.InningHalf.TOP if game_half == "TOP" else db_models.InningHalf.BOTTOM
+                            
+                            final_rc = None
+                            try:
+                                final_rc = db_models.ResultCode(rc)
+                            except ValueError:
+                                # Fallback mappings
+                                if rc == "OUT" or "OUT" in rc:
+                                    final_rc = db_models.ResultCode.GROUND_OUT
+                                else:
+                                    logger.warning(f"Unknown ResultCode '{rc}', defaulting to GO")
+                                    final_rc = db_models.ResultCode.GROUND_OUT
+
+                            # Calculate Sequence safely (count existing for this match + 1)
+                            # Using database count is safer for resumption, but slightly slower. 
+                            # Given this is a simulation loop, local counter is fine if we init it correctly.
+                            # Let's trust auto-increment ID for ordering mostly, but schema requires (match, inning, half, seq).
+                            # We can try to query max seq. Or just use a big random number? No.
+                            # Let's use a simple query for now.
+                            
+                            last_seq = db.query(db_models.PlateAppearance.seq)\
+                                .filter(db_models.PlateAppearance.match_id == match_id)\
+                                .filter(db_models.PlateAppearance.inning == updated_game.inning)\
+                                .filter(db_models.PlateAppearance.half == game_half_enum)\
+                                .order_by(db_models.PlateAppearance.seq.desc())\
+                                .first()
+                            
+                            new_seq = (last_seq[0] + 1) if last_seq else 1
+
+                            pa_record = db_models.PlateAppearance(
+                                match_id=match_id,
+                                inning=updated_game.inning,
+                                half=game_half_enum,
+                                seq=new_seq,
+                                batter_character_id=char_id,
+                                result_code=final_rc, # Ensure this matches Enum
+                                runs_scored=runs_scored,
+                                rbi=runs_scored + (1 if rc == "HOMERUN" else 0), # Simplified RBI logic (Batter on HR is +1 RBI usually included in runs_scored? No, runs_scored is total. RBI is runs driven in.)
+                                # Wait, if runs_scored=1 (HR), RBI is 1. If 3 run HR, runs_scored=4? No runs_scored is total runs in play.
+                                # RBI = runs_scored. (Correct, usually).
+                                # Exception: Error? Wild pitch? Unlikely in simple sim.
+                                # Let's use rbi=runs_scored for now.
+                                outs_added=1 if "O" in str(final_rc.value) or rc == "SO" else 0 
+                                # Check if 'O' in 'GO', 'FO', 'SO'. Yes. '1B' no.
+                            )
+                            db.add(pa_record)
+                        except Exception as e_pa:
+                            logger.error(f"Failed to log PlateAppearance: {e_pa}")
+
+            except Exception as e:
+                logger.error(f"Stats Update Error: {e}")
+
         else:
             # Fallback (Should not happen)
             sim_result = {

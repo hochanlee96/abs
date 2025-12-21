@@ -107,6 +107,16 @@ CREATE TABLE characters (
   defense_arm INT NOT NULL DEFAULT 50,
   position_main VARCHAR(20) NOT NULL DEFAULT 'DH',
   position_sub VARCHAR(20) NULL,
+  
+  -- [Phase 3] Season Stats (Accumulated)
+  games_played INT NOT NULL DEFAULT 0,
+  at_bats INT NOT NULL DEFAULT 0,
+  hits INT NOT NULL DEFAULT 0,
+  homeruns INT NOT NULL DEFAULT 0,
+  rbis INT NOT NULL DEFAULT 0,
+  runs INT NOT NULL DEFAULT 0,
+  walks INT NOT NULL DEFAULT 0,
+  strikeouts INT NOT NULL DEFAULT 0,
 
   contact_exp INT NOT NULL DEFAULT 0,
   power_exp INT NOT NULL DEFAULT 0,
@@ -227,12 +237,12 @@ CREATE TABLE plate_appearances (
   batter_character_id BIGINT UNSIGNED NOT NULL,
 
   result_code ENUM(
-    'SO','BB','HBP','FO','GO','1B','2B','3B','HR'
+    'SO','BB','HBP','FO','GO','1B','2B','3B','HOMERUN'
   ) NOT NULL,
 
-  runs_scored INT NOT NULL DEFAULT 0,  -- 0~4
-  rbi INT NOT NULL DEFAULT 0,
-  outs_added INT NOT NULL DEFAULT 0,   -- 0~3
+  runs_scored INT DEFAULT 0,
+  rbi INT DEFAULT 0,
+  outs_added INT DEFAULT 0,
 
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
