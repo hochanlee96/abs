@@ -119,9 +119,9 @@ CREATE TABLE characters (
   position_main VARCHAR(20) NOT NULL DEFAULT 'DH',
   position_sub VARCHAR(20) NULL,
 
-  contact_exp INT NOT NULL DEFAULT 0,
-  power_exp INT NOT NULL DEFAULT 0,
-  speed_exp INT NOT NULL DEFAULT 0,
+  contact_xp INT NOT NULL DEFAULT 0,
+  power_xp INT NOT NULL DEFAULT 0,
+  speed_xp INT NOT NULL DEFAULT 0,
 
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -289,9 +289,8 @@ CREATE TABLE training_sessions (
   applied_power_delta INT NOT NULL DEFAULT 0,
   applied_speed_delta INT NOT NULL DEFAULT 0,
 
-  exp_gained_contact INT NOT NULL DEFAULT 0,
-  exp_gained_power INT NOT NULL DEFAULT 0,
-  exp_gained_speed INT NOT NULL DEFAULT 0,
+  xp_gained INT NOT NULL DEFAULT 0,
+  is_critical BOOLEAN NOT NULL DEFAULT 0,
 
   PRIMARY KEY (training_session_id),
   KEY idx_training_sessions_character (character_id, performed_at),
