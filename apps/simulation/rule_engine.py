@@ -27,12 +27,13 @@ class BaseballRuleEngine:
             runs_this_play = BaseballRuleEngine._advance_runners(game, current_batter, bases_advanced=3)
         elif "HR" in code or "HOMERUN" in code:
             runs_this_play = BaseballRuleEngine._advance_runners(game, current_batter, bases_advanced=4)
-        elif "BB" in code or "WALK" in code:
+        elif "BB" in code or "WALK" in code or "E" == code:
              # 볼넷은 밀어내기 로직이 다름 (무조건 진루가 아니라 1루가 차있을때만)
+             # 실책(E)은 MVP 수준에선 일단 1루 진입으로 처리
              runs_this_play = BaseballRuleEngine._handle_walk(game, current_batter)
         
         # 2. Handle Outs
-        elif "OUT" in code or "STRIKEOUT" in code or "SO" in code or "GO" in code or "FO" in code or "LO" in code:
+        elif any(x in code for x in ["OUT", "STRIKEOUT", "SO", "GO", "FO", "LO", "FLY", "PO", "K"]):
              runs_this_play = BaseballRuleEngine._handle_out(game)
              
         # 3. Update Score

@@ -30,9 +30,25 @@ class ResultCode(str, PyEnum):
     TRIPLE = "TRIPLE"
     HOMERUN = "HOMERUN"
     OUT = "OUT"
-    # Added for completeness if needed
     FLY_OUT = "FLY_OUT"
     GROUND_OUT = "GROUND_OUT"
+    FLY = "FLY"
+    FO = "FO"
+    GO = "GO"
+    SO = "SO"
+    LO = "LO"
+    PO = "PO"
+    K = "K"
+    # Unified Codes
+    _1B = "1B"
+    _2B = "2B"
+    _3B = "3B"
+    _HR = "HR"
+    BB = "BB"
+    IBB = "IBB"
+    HBP = "HBP"
+    E = "E"
+    FC = "FC"
 
 class Account(Base):
     __tablename__ = "accounts"
@@ -69,7 +85,7 @@ class Team(Base):
     user_character_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True) # Leader or main character
 
     world: Mapped["World"] = relationship(back_populates="teams")
-    team_players: Mapped[List["TeamPlayer"]] = relationship(back_populates="team")
+    team_players: Mapped[List["TeamPlayer"]] = relationship(back_populates="team", order_by="TeamPlayer.team_player_id")
     
     # Relationships for matches
     home_matches: Mapped[List["Match"]] = relationship(foreign_keys="[Match.home_team_id]", back_populates="home_team")
@@ -123,6 +139,8 @@ class Character(Base):
     total_runs: Mapped[int] = mapped_column(Integer, default=0)
     total_bb: Mapped[int] = mapped_column(Integer, default=0)
     total_so: Mapped[int] = mapped_column(Integer, default=0)
+    total_earned_runs: Mapped[int] = mapped_column(Integer, default=0)
+    total_outs_pitched: Mapped[int] = mapped_column(Integer, default=0)
     
     # Fielder Specific
     defense_range: Mapped[int] = mapped_column(Integer, default=50)
@@ -183,7 +201,8 @@ class PlateAppearance(Base):
     half: Mapped[InningHalf] = mapped_column(Enum(InningHalf), nullable=False)
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     batter_character_id: Mapped[int] = mapped_column(ForeignKey("characters.character_id"), nullable=False)
-    result_code: Mapped[Optional[ResultCode]] = mapped_column(Enum(ResultCode), nullable=True)
+    # To avoid Enum name/value issues (e.g. "1B" vs "_1B"), we store as simple String
+    result_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
     match: Mapped["Match"] = relationship(back_populates="plate_appearances")
     batter: Mapped["Character"] = relationship(back_populates="plate_appearances")

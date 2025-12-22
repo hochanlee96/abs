@@ -42,7 +42,13 @@ export interface CharacterStats {
 }
 
 export async function apiGetCharacterStats(characterId: number): Promise<CharacterStats> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/characters/${characterId}/stats`);
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/characters/${characterId}/stats`, {
+    headers: {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    }
+  });
   if (!res.ok) {
     throw new Error("Failed to fetch stats");
   }
@@ -96,7 +102,11 @@ export async function apiGetMyCharacter(idToken: string): Promise<Character | nu
   // Try backend first
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/me/characters`, {
-      headers: { Authorization: `Bearer ${idToken}` }
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
     });
     if (res.ok) {
       const chars = await res.json();
@@ -258,7 +268,12 @@ export async function apiPlayMatch(idToken: string, worldId?: number): Promise<{
 
 export async function apiGetMatch(idToken: string, matchId: number): Promise<any> {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/matches/${matchId}`, {
-    headers: { Authorization: `Bearer ${idToken}` }
+    headers: {
+      "Authorization": `Bearer ${idToken}`,
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    }
   });
   if (!res.ok) throw new Error("Failed to get match details");
   return res.json();

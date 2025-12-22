@@ -133,21 +133,6 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
-
-      {/* Debug Section */}
-      <div style={{ marginTop: 40, borderTop: '1px solid #333', paddingTop: 20 }}>
-        <h3 style={{ color: '#666', marginBottom: 10 }}>Debug Info</h3>
-        <div style={{
-          background: '#1a1a1a',
-          padding: 15,
-          borderRadius: 8,
-          fontFamily: 'monospace',
-          fontSize: '0.8rem',
-          color: '#4ade80'
-        }}>
-          {logs.length === 0 ? "Loading world data..." : logs.map((l, i) => <div key={i}>{l}</div>)}
-        </div>
-      </div>
     </div>
   );
 }

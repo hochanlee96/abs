@@ -2,7 +2,7 @@ import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import styles from "../../styles/LiveMatch.module.css";
-import { MatchEventType, BroadcastData, MatchEventMessage, SimulationResult, PlayerInfo } from "../../types/match";
+import { MatchEventType, BroadcastData, MatchEventMessage, SimulationResult, PlayerInfo, MatchDetail, TeamPlayer, Character } from "../../types/match";
 import { apiGetMatch } from "../../lib/api";
 
 import BaseballField from "../../components/BaseballField";
@@ -36,7 +36,7 @@ export default function LiveMatchPage() {
 
         const interval = setInterval(async () => {
             try {
-                const match = await apiGetMatch(idToken, Number(matchId));
+                const match = await apiGetMatch(idToken, Number(matchId)) as MatchDetail;
 
                 if (match.status === "FINISHED") {
                     setGameState("FINISHED");
@@ -45,6 +45,58 @@ export default function LiveMatchPage() {
                 } else {
                     setGameState("READY");
                 }
+
+                // --- Roster & Stats Processing ---
+                // Helper to format stats
+                const formatAvg = (c: Character) => {
+                    if (c.total_ab === 0) return ".000";
+                    const avg = c.total_hits / c.total_ab;
+                    if (avg >= 1) return "1.000";
+                    return avg.toFixed(3).substring(1);
+                };
+                const formatEra = (c: Character) => {
+                    const ip = c.total_outs_pitched / 3;
+                    if (ip === 0) return "-.--";
+                    return ((c.total_earned_runs * 9) / ip).toFixed(2);
+                };
+
+                const processRoster = (players: TeamPlayer[]) => {
+                    // Filter based on Character Position, NOT TeamPlayer.role (which is USER/AI)
+                    const pitchers = players.filter(p =>
+                        p.is_active &&
+                        (p.character.position_main.toUpperCase().includes("PITCHER") || p.character.position_main.toUpperCase() === "P")
+                    );
+
+                    const batters = players.filter(p =>
+                        p.is_active &&
+                        !p.character.position_main.toUpperCase().includes("PITCHER") &&
+                        p.character.position_main.toUpperCase() !== "P"
+                    );
+
+                    return [...batters, ...pitchers].map(p => {
+                        const isPitcher = pitchers.includes(p);
+                        return {
+                            name: p.character.nickname,
+                            role: isPitcher ? "PITCHER" : "BATTER",
+                            stats: {
+                                avg: parseFloat(formatAvg(p.character)),
+                                era: parseFloat(formatEra(p.character)),
+                                avg_val: p.character.total_ab > 0 ? p.character.total_hits / p.character.total_ab : 0,
+                                era_val: p.character.total_outs_pitched > 0 ? (p.character.total_earned_runs * 9) / (p.character.total_outs_pitched / 3) : 0
+                            },
+                            displayAvg: formatAvg(p.character),
+                            displayEra: formatEra(p.character)
+                        };
+                    });
+                };
+
+                if (match.home_team && match.home_team.team_players) {
+                    setHomeLineup(processRoster(match.home_team.team_players));
+                }
+                if (match.away_team && match.away_team.team_players) {
+                    setAwayLineup(processRoster(match.away_team.team_players));
+                }
+                // ---------------------------------
 
                 if (match.game_state && match.game_state.logs) {
                     const simLogs: BroadcastData[] = match.game_state.logs;
@@ -125,8 +177,8 @@ export default function LiveMatchPage() {
             {/* Scoreboard */}
             <div className={styles.scoreboard}>
                 <div className={styles.teamScore}>
-                    <div className={styles.teamName}>HOME</div>
-                    <div className={styles.score}>{score.home}</div>
+                    <div className={styles.teamName}>AWAY</div>
+                    <div className={styles.score}>{score.away}</div>
                 </div>
 
                 <div className={styles.matchInfo}>
@@ -205,8 +257,8 @@ export default function LiveMatchPage() {
                 </div>
 
                 <div className={styles.teamScore}>
-                    <div className={styles.teamName}>AWAY</div>
-                    <div className={styles.score}>{score.away}</div>
+                    <div className={styles.teamName}>HOME</div>
+                    <div className={styles.score}>{score.home}</div>
                 </div>
             </div>
 
@@ -238,15 +290,19 @@ export default function LiveMatchPage() {
                     {/* Away Lineup (Left) */}
                     <div style={{ background: '#222', padding: '10px', borderRadius: '8px', fontSize: '0.8rem' }}>
                         <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#aaa' }}>AWAY ROSTER</div>
-                        {awayLineup.map((p, i) => (
+                        {awayLineup.map((p: any, i) => (
                             <div key={i} style={{
                                 padding: '4px',
                                 borderBottom: '1px solid #333',
+                                display: 'flex', justifyContent: 'space-between',
                                 backgroundColor: (isTop && p.name === currentBatterName) || (!isTop && p.name === currentPitcherName) ? '#374151' : 'transparent',
                                 color: (isTop && p.name === currentBatterName) ? '#fbbf24' : (!isTop && p.name === currentPitcherName) ? '#60a5fa' : '#ccc',
                                 fontWeight: (p.name === currentBatterName || p.name === currentPitcherName) ? 'bold' : 'normal'
                             }}>
-                                {p.name} <span style={{ fontSize: '0.7em', color: '#666' }}>{p.role}</span>
+                                <span>{p.name} <span style={{ fontSize: '0.7em', color: '#666' }}>{p.role === 'PITCHER' ? 'P' : 'B'}</span></span>
+                                <span style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>
+                                    {p.role === 'PITCHER' ? `ERA ${p.displayEra}` : `AVG ${p.displayAvg}`}
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -290,15 +346,19 @@ export default function LiveMatchPage() {
                     {/* Home Lineup (Right) */}
                     <div style={{ background: '#222', padding: '10px', borderRadius: '8px', fontSize: '0.8rem' }}>
                         <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#aaa' }}>HOME ROSTER</div>
-                        {homeLineup.map((p, i) => (
+                        {homeLineup.map((p: any, i) => (
                             <div key={i} style={{
                                 padding: '4px',
                                 borderBottom: '1px solid #333',
+                                display: 'flex', justifyContent: 'space-between',
                                 backgroundColor: (!isTop && p.name === currentBatterName) || (isTop && p.name === currentPitcherName) ? '#374151' : 'transparent',
                                 color: (!isTop && p.name === currentBatterName) ? '#fbbf24' : (isTop && p.name === currentPitcherName) ? '#60a5fa' : '#ccc',
                                 fontWeight: (p.name === currentBatterName || p.name === currentPitcherName) ? 'bold' : 'normal'
                             }}>
-                                {p.name} <span style={{ fontSize: '0.7em', color: '#666' }}>{p.role}</span>
+                                <span>{p.name} <span style={{ fontSize: '0.7em', color: '#666' }}>{p.role === 'PITCHER' ? 'P' : 'B'}</span></span>
+                                <span style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>
+                                    {p.role === 'PITCHER' ? `ERA ${p.displayEra}` : `AVG ${p.displayAvg}`}
+                                </span>
                             </div>
                         ))}
                     </div>

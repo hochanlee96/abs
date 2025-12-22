@@ -165,8 +165,17 @@ def create_match(db: Session, world_id: int, home_team_id: int, away_team_id: in
     db.refresh(match)
     return match
 
+from sqlalchemy.orm import selectinload
+
 def get_match(db: Session, match_id: int) -> Optional[Match]:
-    return db.execute(select(Match).where(Match.match_id == match_id)).scalar_one_or_none()
+    return db.execute(
+        select(Match)
+        .where(Match.match_id == match_id)
+        .options(
+            selectinload(Match.home_team).selectinload(Team.team_players).selectinload(TeamPlayer.character),
+            selectinload(Match.away_team).selectinload(Team.team_players).selectinload(TeamPlayer.character)
+        )
+    ).scalar_one_or_none()
 
 def get_next_scheduled_match(db: Session, world_id: Optional[int] = None) -> Optional[Match]:
     query = select(Match).where(Match.status == MatchStatus.SCHEDULED)
@@ -276,8 +285,12 @@ def perform_training(db: Session, character_id: int, training_id: int) -> dict:
         is_critical=is_critical
     )
     db.add(session)
+    db.add(character) # Explicitly mark as dirty/add to session
     db.commit()
     db.refresh(character)
+    
+    # Log for debugging
+    print(f"TRAINING SUCCESS: Char {character_id} gaining {xp_gained} XP. New XP={getattr(character, current_xp_field)}. Level={getattr(character, current_level_field)}")
     
     return {
         "success": True,

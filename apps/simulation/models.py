@@ -297,8 +297,7 @@ class SimulationResult(BaseModel):
     reasoning: str = Field(description="판정 추론 과정 (STEP-BY-STEP Thinking)") # CoT
     result_code: str # HIT, OUT, HOMERUN, WALK, STRIKEOUT ...
     description: str # 중계 멘트
-    
-    # [Agent-Environment Refactor]
+    runs_scored: int = 0 # 이번 플레이 득점
     # AI determines ONLY the event (Result), NOT the consequence (State Change).
     # final_bases & runs_scored are removed.
     

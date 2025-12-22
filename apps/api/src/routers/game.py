@@ -157,7 +157,9 @@ def delete_character(character_id: int, db: Session = Depends(get_db), payload: 
 def create_match(match: MatchCreate, db: Session = Depends(get_db)):
     return crud_game.create_match(db, match.world_id, match.home_team_id, match.away_team_id)
 
-@router.get("/matches/{match_id}")
+from .. import schemas
+
+@router.get("/matches/{match_id}", response_model=schemas.MatchSchema)
 def get_match(match_id: int, db: Session = Depends(get_db)):
     match = crud_game.get_match(db, match_id)
     if not match:
@@ -179,7 +181,7 @@ def play_match(body: PlayRequest, background_tasks: BackgroundTasks, db: Session
         raise HTTPException(status_code=404, detail="No scheduled matches found")
     
     # 2. Start Background Task
-    background_tasks.add_task(run_match_background, match.match_id, db)
+    background_tasks.add_task(run_match_background, match.match_id)
     
     return {"status": "started", "match_id": match.match_id, "message": "Simulation started in background"}
 
