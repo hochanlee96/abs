@@ -111,6 +111,8 @@ CREATE TABLE characters (
   total_runs INT NOT NULL DEFAULT 0,
   total_bb INT NOT NULL DEFAULT 0,
   total_so INT NOT NULL DEFAULT 0,
+  total_earned_runs INT NOT NULL DEFAULT 0,
+  total_outs_pitched INT NOT NULL DEFAULT 0,
 
   -- Fielder Specific
   defense_range INT NOT NULL DEFAULT 50,
@@ -237,9 +239,7 @@ CREATE TABLE plate_appearances (
 
   batter_character_id BIGINT UNSIGNED NOT NULL,
 
-  result_code ENUM(
-    'SO','BB','HBP','FO','GO','1B','2B','3B','HR'
-  ) NOT NULL,
+  result_code VARCHAR(10) NULL,
 
   runs_scored INT NOT NULL DEFAULT 0,  -- 0~4
   rbi INT NOT NULL DEFAULT 0,
