@@ -1,0 +1,100 @@
+api-1  | DB not ready yet, retrying in 2s... (10 left) Error: (pymysql.err.OperationalError) (2003, "Can't connect to MySQL server on 'mariadb' ([Errno 111] Connection refused)")
+api-1  | (Background on this error at: https://sqlalche.me/e/20/e3q8)
+api-1  | DEBUG: Attempting DB connection (Retry 2)
+api-1  | Seeded initial trainings
+api-1  | INFO:     172.21.0.1:59110 - "OPTIONS /api/v1/me/characters HTTP/1.1" 200 OK
+api-1  | INFO:     172.21.0.1:59118 - "OPTIONS /api/v1/me/characters HTTP/1.1" 200 OK
+api-1  | [DEBUG] Auth Header: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjZhOTA2ZWMxMTlkN2JhNDZhNmE0M2VmMWVhODQyZTM0YThlZTA4YjQiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI4ODM0MDUyMjU3NTItN3Y5YmZscTFubnRmcXYzNG9uZGo4dXN2MzJ2NTYxbWUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI4ODM0MDUyMjU3NTItN3Y5YmZscTFubnRmcXYzNG9uZGo4dXN2MzJ2NTYxbWUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDE2MjYxMDM3MjE1ODk4ODU1NTMiLCJlbWFpbCI6Imp3c2xpdHRsZUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXRfaGFzaCI6Im5CZTAzdXpYT3ZpYWJ4YW1wQzNoYmciLCJuYW1lIjoi7KGw7Jqw7IOBIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0o4Rzg0MDBZc0dfTFdDdU1jVno5WEk2dGFVdEFJdVU1NG5kd0llMU9qM1hXRVN3QT1zOTYtYyIsImdpdmVuX25hbWUiOiLsmrDsg4EiLCJmYW1pbHlfbmFtZSI6IuyhsCIsImlhdCI6MTc2NjI5NjAzNiwiZXhwIjoxNzY2Mjk5NjM2fQ.MZPsQBh-Yu97tNFioqF9LuRuf701sUWI0vvGxL8JjCiPoKEPHBZeOc8uvjSSMQ_295LPNAg-l2IUrkqSKybFcx9-xXWauD3vfvBydsuAhE4k5-POIurd-QhJ-LhzeeVBgni9OhTXZGUU_-5DqkuSUX3-14JYK6dOFpY1OloTHnAQX4nygj2HalOFj_KXiu4m3XPFD2Y4VSc_4pb6CLWPAJtk_eP5bQlJ9hAf6orpQCWNUTGWB9SmGSWFHb8W_GqG_EM0vKOtbUg0fN575pIC8YbQ_0UU5td4QIHzv5-bRdS1CvpiqG9EIYk0FmXmx150Pukhlf8Jc_x7CuZqEciimg
+api-1  | INFO:     172.21.0.1:59118 - "GET /api/v1/me/characters HTTP/1.1" 200 OK
+api-1  | [DEBUG] Auth Header: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjZhOTA2ZWMxMTlkN2JhNDZhNmE0M2VmMWVhODQyZTM0YThlZTA4YjQiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI4ODM0MDUyMjU3NTItN3Y5YmZscTFubnRmcXYzNG9uZGo4dXN2MzJ2NTYxbWUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI4ODM0MDUyMjU3NTItN3Y5YmZscTFubnRmcXYzNG9uZGo4dXN2MzJ2NTYxbWUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDE2MjYxMDM3MjE1ODk4ODU1NTMiLCJlbWFpbCI6Imp3c2xpdHRsZUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXRfaGFzaCI6Im5CZTAzdXpYT3ZpYWJ4YW1wQzNoYmciLCJuYW1lIjoi7KGw7Jqw7IOBIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0o4Rzg0MDBZc0dfTFdDdU1jVno5WEk2dGFVdEFJdVU1NG5kd0llMU9qM1hXRVN3QT1zOTYtYyIsImdpdmVuX25hbWUiOiLsmrDsg4EiLCJmYW1pbHlfbmFtZSI6IuyhsCIsImlhdCI6MTc2NjI5NjAzNiwiZXhwIjoxNzY2Mjk5NjM2fQ.MZPsQBh-Yu97tNFioqF9LuRuf701sUWI0vvGxL8JjCiPoKEPHBZeOc8uvjSSMQ_295LPNAg-l2IUrkqSKybFcx9-xXWauD3vfvBydsuAhE4k5-POIurd-QhJ-LhzeeVBgni9OhTXZGUU_-5DqkuSUX3-14JYK6dOFpY1OloTHnAQX4nygj2HalOFj_KXiu4m3XPFD2Y4VSc_4pb6CLWPAJtk_eP5bQlJ9hAf6orpQCWNUTGWB9SmGSWFHb8W_GqG_EM0vKOtbUg0fN575pIC8YbQ_0UU5td4QIHzv5-bRdS1CvpiqG9EIYk0FmXmx150Pukhlf8Jc_x7CuZqEciimg
+api-1  | INFO:     172.21.0.1:59118 - "GET /api/v1/me/characters HTTP/1.1" 200 OK
+api-1  | INFO:     172.21.0.1:49262 - "OPTIONS /api/v1/worlds HTTP/1.1" 200 OK
+api-1  | INFO:     172.21.0.1:49262 - "POST /api/v1/worlds HTTP/1.1" 200 OK
+api-1  | INFO:     172.21.0.1:49262 - "OPTIONS /me HTTP/1.1" 200 OK
+api-1  | [DEBUG] Auth Header: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjZhOTA2ZWMxMTlkN2JhNDZhNmE0M2VmMWVhODQyZTM0YThlZTA4YjQiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI4ODM0MDUyMjU3NTItN3Y5YmZscTFubnRmcXYzNG9uZGo4dXN2MzJ2NTYxbWUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI4ODM0MDUyMjU3NTItN3Y5YmZscTFubnRmcXYzNG9uZGo4dXN2MzJ2NTYxbWUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDE2MjYxMDM3MjE1ODk4ODU1NTMiLCJlbWFpbCI6Imp3c2xpdHRsZUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXRfaGFzaCI6Im5CZTAzdXpYT3ZpYWJ4YW1wQzNoYmciLCJuYW1lIjoi7KGw7Jqw7IOBIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0o4Rzg0MDBZc0dfTFdDdU1jVno5WEk2dGFVdEFJdVU1NG5kd0llMU9qM1hXRVN3QT1zOTYtYyIsImdpdmVuX25hbWUiOiLsmrDsg4EiLCJmYW1pbHlfbmFtZSI6IuyhsCIsImlhdCI6MTc2NjI5NjAzNiwiZXhwIjoxNzY2Mjk5NjM2fQ.MZPsQBh-Yu97tNFioqF9LuRuf701sUWI0vvGxL8JjCiPoKEPHBZeOc8uvjSSMQ_295LPNAg-l2IUrkqSKybFcx9-xXWauD3vfvBydsuAhE4k5-POIurd-QhJ-LhzeeVBgni9OhTXZGUU_-5DqkuSUX3-14JYK6dOFpY1OloTHnAQX4nygj2HalOFj_KXiu4m3XPFD2Y4VSc_4pb6CLWPAJtk_eP5bQlJ9hAf6orpQCWNUTGWB9SmGSWFHb8W_GqG_EM0vKOtbUg0fN575pIC8YbQ_0UU5td4QIHzv5-bRdS1CvpiqG9EIYk0FmXmx150Pukhlf8Jc_x7CuZqEciimg
+api-1  | INFO:     172.21.0.1:49262 - "GET /me HTTP/1.1" 200 OK
+api-1  | INFO:     172.21.0.1:49262 - "OPTIONS /api/v1/characters HTTP/1.1" 200 OK
+api-1  | [DEBUG] Auth Header: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjZhOTA2ZWMxMTlkN2JhNDZhNmE0M2VmMWVhODQyZTM0YThlZTA4YjQiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI4ODM0MDUyMjU3NTItN3Y5YmZscTFubnRmcXYzNG9uZGo4dXN2MzJ2NTYxbWUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI4ODM0MDUyMjU3NTItN3Y5YmZscTFubnRmcXYzNG9uZGo4dXN2MzJ2NTYxbWUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDE2MjYxMDM3MjE1ODk4ODU1NTMiLCJlbWFpbCI6Imp3c2xpdHRsZUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXRfaGFzaCI6Im5CZTAzdXpYT3ZpYWJ4YW1wQzNoYmciLCJuYW1lIjoi7KGw7Jqw7IOBIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0o4Rzg0MDBZc0dfTFdDdU1jVno5WEk2dGFVdEFJdVU1NG5kd0llMU9qM1hXRVN3QT1zOTYtYyIsImdpdmVuX25hbWUiOiLsmrDsg4EiLCJmYW1pbHlfbmFtZSI6IuyhsCIsImlhdCI6MTc2NjI5NjAzNiwiZXhwIjoxNzY2Mjk5NjM2fQ.MZPsQBh-Yu97tNFioqF9LuRuf701sUWI0vvGxL8JjCiPoKEPHBZeOc8uvjSSMQ_295LPNAg-l2IUrkqSKybFcx9-xXWauD3vfvBydsuAhE4k5-POIurd-QhJ-LhzeeVBgni9OhTXZGUU_-5DqkuSUX3-14JYK6dOFpY1OloTHnAQX4nygj2HalOFj_KXiu4m3XPFD2Y4VSc_4pb6CLWPAJtk_eP5bQlJ9hAf6orpQCWNUTGWB9SmGSWFHb8W_GqG_EM0vKOtbUg0fN575pIC8YbQ_0UU5td4QIHzv5-bRdS1CvpiqG9EIYk0FmXmx150Pukhlf8Jc_x7CuZqEciimg
+api-1  | INFO:     172.21.0.1:49264 - "POST /api/v1/characters HTTP/1.1" 500 Internal Server Error
+api-1  | ERROR:    Exception in ASGI application
+api-1  | Traceback (most recent call last):
+api-1  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+api-1  |     result = await app(  # type: ignore[func-returns-value]
+api-1  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+api-1  |     return await self.app(scope, receive, send)
+api-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/applications.py", line 1135, in __call__
+api-1  |     await super().__call__(scope, receive, send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/applications.py", line 107, in __call__
+api-1  |     await self.middleware_stack(scope, receive, send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+api-1  |     raise exc
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+api-1  |     await self.app(scope, receive, _send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/middleware/cors.py", line 93, in __call__
+api-1  |     await self.simple_response(scope, receive, send, request_headers=headers)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/middleware/cors.py", line 144, in simple_response
+api-1  |     await self.app(scope, receive, send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+api-1  |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+api-1  |     raise exc
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+api-1  |     await app(scope, receive, sender)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+api-1  |     await self.app(scope, receive, send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/routing.py", line 716, in __call__
+api-1  |     await self.middleware_stack(scope, receive, send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/routing.py", line 736, in app
+api-1  |     await route.handle(scope, receive, send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/routing.py", line 290, in handle
+api-1  |     await self.app(scope, receive, send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/routing.py", line 118, in app
+api-1  |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+api-1  |     raise exc
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+api-1  |     await app(scope, receive, sender)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/routing.py", line 104, in app
+api-1  |     response = await f(request)
+api-1  |                ^^^^^^^^^^^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/routing.py", line 428, in app
+api-1  |     raw_response = await run_endpoint_function(
+api-1  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/routing.py", line 316, in run_endpoint_function
+api-1  |     return await run_in_threadpool(dependant.call, **values)
+api-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/concurrency.py", line 32, in run_in_threadpool
+api-1  |     return await anyio.to_thread.run_sync(func)
+api-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/anyio/to_thread.py", line 61, in run_sync
+api-1  |     return await get_async_backend().run_sync_in_worker_thread(
+api-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 2525, in run_sync_in_worker_thread
+api-1  |     return await future
+api-1  |            ^^^^^^^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 986, in run
+api-1  |     result = context.run(func, *args)
+api-1  |              ^^^^^^^^^^^^^^^^^^^^^^^^
+api-1  |   File "/app/src/routers/game.py", line 102, in create_character
+api-1  |     return crud_game.create_character(
+api-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+api-1  |   File "/app/src/crud_game.py", line 66, in create_character
+api-1  |     char = Character(
+api-1  |            ^^^^^^^^^^
+api-1  |   File "<string>", line 4, in __init__
+api-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/state.py", line 596, in _initialize_instance
+api-1  |     with util.safe_reraise():
+api-1  |          ^^^^^^^^^^^^^^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+api-1  |     raise exc_value.with_traceback(exc_tb)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/state.py", line 594, in _initialize_instance
+api-1  |     manager.original_init(*mixed[1:], **kwargs)
+api-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 2179, in _declarative_constructor
+api-1  |     raise TypeError(
+api-1  | TypeError: 'contact_left' is an invalid keyword argument for Character
+api-1  | INFO:     Shutting down
+api-1  | INFO:     Waiting for application shutdown.
+api-1  | INFO:     Application shutdown complete.
+api-1  | INFO:     Finished server process [1]

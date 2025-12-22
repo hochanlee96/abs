@@ -108,6 +108,17 @@ class Character(Base):
     power_left: Mapped[int] = mapped_column(Integer, default=0)
     power_right: Mapped[int] = mapped_column(Integer, default=0)
     
+    # Cumulative Stats (Synced with Simulation)
+    total_games: Mapped[int] = mapped_column(Integer, default=0)
+    total_pa: Mapped[int] = mapped_column(Integer, default=0)
+    total_ab: Mapped[int] = mapped_column(Integer, default=0)
+    total_hits: Mapped[int] = mapped_column(Integer, default=0)
+    total_homeruns: Mapped[int] = mapped_column(Integer, default=0)
+    total_rbis: Mapped[int] = mapped_column(Integer, default=0)
+    total_runs: Mapped[int] = mapped_column(Integer, default=0)
+    total_bb: Mapped[int] = mapped_column(Integer, default=0)
+    total_so: Mapped[int] = mapped_column(Integer, default=0)
+    
     # Fielder Specific
     defense_range: Mapped[int] = mapped_column(Integer, default=50)
     defense_error: Mapped[int] = mapped_column(Integer, default=50)

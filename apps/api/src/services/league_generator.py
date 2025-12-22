@@ -36,8 +36,8 @@ def generate_league(db: Session, user_character_id: int, world_name: str = "New 
     if not user_char:
         raise ValueError("User character not found")
         
-    # Pre-generate unique names for all NPCs (4 teams * 9 players = 36)
-    required_names_count = 4 * 9
+    # Pre-generate unique names for all NPCs (4 teams * 15 players = 60)
+    required_names_count = 4 * 15
     unique_names = set()
     while len(unique_names) < required_names_count:
         unique_names.add(generate_random_name())
@@ -51,14 +51,20 @@ def generate_league(db: Session, user_character_id: int, world_name: str = "New 
         teams.append(team)
         
         # Determine Roster Size for this team
-        # If user is in this team (Team 0), we need 8 NPCs. Else 9.
-        current_roster_size = 9
+        # We need at least 9 batters + 5 pitchers = 14 players.
+        # Let's target 15 players per team (5 Pitchers, 10 Batters).
+        
+        current_roster_size = 15
+        user_team_npc_count = 14 # 1 User + 14 NPCs = 15 total
+        
         if i == 0:
-            current_roster_size = 8
+            count = user_team_npc_count
             # Add User Player
             db.add(TeamPlayer(team_id=team.team_id, character_id=user_char.character_id, role=Role.USER))
+        else:
+            count = current_roster_size
         
-        for _ in range(current_roster_size):
+        for _ in range(count):
             # Stats
             con = max(1, min(10, int(random.gauss(5, 1.5))))
             pow = max(1, min(10, int(random.gauss(5, 1.5))))
@@ -96,13 +102,29 @@ def generate_league(db: Session, user_character_id: int, world_name: str = "New 
                 defense_range=int(random.gauss(50, 15)),
                 defense_error=int(random.gauss(50, 15)),
                 defense_arm=int(random.gauss(50, 15)),
-                position_main="PITCHER" if _ == 0 else "FIELDER" # 단순화: 첫 번째는 투수
+                position_main="PITCHER" if _ < 5 else "DH" # 0~4번 인덱스(5명)는 투수, 나머지는 야수(DH/Fielder)
             )
             
-            # Link TeamPlayer
-            db.add(TeamPlayer(team_id=team.team_id, character_id=npc.character_id, role=Role.AI))
+            # User Character Position Fix
+            if i == 0 and _ == 0:
+                 # This logic block creates NPCs, but waiting... 
+                 # Ah, user is added SEPARATELY below or above?
+                 # Looking at line 59: db.add(TeamPlayer(..., role=Role.USER))
+                 # But the user character entity itself might have random position if not set properly?
+                 # No, user character is passed in via `user_character_id`. We need to UPDATE it.
+                 pass
             
-    # Add User to Team 0 explicitly now
+            # Link TeamPlayer
+            # Link TeamPlayer
+            # All NPCs have Role.AI
+            role = Role.AI
+            db.add(TeamPlayer(team_id=team.team_id, character_id=npc.character_id, role=role))
+            
+    # Add User to Team 0 explictly now
+    # Force User Position to Batter if not valid
+    if "P" in user_char.position_main.upper() or "PITCHER" in user_char.position_main.upper():
+        user_char.position_main = "DH" # 강제 타자 전환
+    
     # Also update user character's world_id to the new world
     user_char.world_id = world.world_id
     db.add(user_char)

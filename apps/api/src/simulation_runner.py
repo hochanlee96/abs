@@ -97,8 +97,12 @@ def run_match_background(match_id: int, db: Session):
         for idx, tp in enumerate(players):
             db_char = tp.character
             # Map DB Role to Sim Role
-            # Infer Position: Index 0 is Pitcher, rest are Batters
-            sim_role = sim_models.Role.PITCHER if idx == 0 else sim_models.Role.BATTER
+            # Check actual position string
+            pos_main = db_char.position_main.upper()
+            if "P" in pos_main or "PITCHER" in pos_main:
+                sim_role = sim_models.Role.PITCHER
+            else:
+                sim_role = sim_models.Role.BATTER
             
             sim_char = to_sim_char(db_char, sim_role)
             roster.append(sim_models.PlayerState(character=sim_char))
@@ -166,13 +170,65 @@ def run_match_background(match_id: int, db: Session):
             sim_result = {
                 "reasoning": "Fallback (No Result)",
                 "result_code": "GO",
-                "description": last_log_text,
+                "description": "Simulation Error Fallback", 
                 "runners_advanced": False,
                 "final_bases": [None, None, None],
                 "runs_scored": runs_scored,
                 "pitch_desc": "",
                 "hit_desc": ""
             }
+
+        # [Stats Update] - Sync with DB Character
+        if updated_game.last_result:
+            try:
+                # Identify Batter
+                batter_state = updated_game.get_current_batter()
+                # Determine Result Code
+                r_code = updated_game.last_result.result_code # String e.g. "1B", "GO"
+                
+                if batter_state:
+                    char_id = batter_state.character.character_id
+                    db_char = db.query(db_models.Character).filter_by(character_id=char_id).first()
+                    
+                    if db_char:
+                        db_char.total_pa += 1
+                        
+                        # Hit
+                        if r_code in ["1B", "2B", "3B", "HR"]:
+                            db_char.total_ab += 1
+                            db_char.total_hits += 1
+                            if r_code == "HR":
+                                db_char.total_homeruns += 1
+                                db_char.total_rbis += runs_scored # Home run implies RBI for self + runners
+                            else:
+                                # For non-HR hits, runs_scored might belong to runners, but roughly add to batter's RBI if runners scored on this play
+                                # Precise RBI logic requires knowing WHO scored, but MVP approximation:
+                                if runs_scored > 0:
+                                    db_char.total_rbis += runs_scored
+                        
+                        # Out
+                        elif r_code in ["GO", "FO", "LO", "PO", "SO"]:
+                            db_char.total_ab += 1
+                            if r_code == "SO":
+                                db_char.total_so += 1
+                        
+                        # Walk / Dead Ball
+                        elif r_code in ["BB", "IBB", "HBP"]:
+                             db_char.total_bb += 1
+                             # No AB increment
+                             if runs_scored > 0: # Push out loaded bases?
+                                 db_char.total_rbis += runs_scored # Approximation
+
+                        # Runs (Self) - Logic needed if batter scored? 
+                        # This is tricky because `runs_scored` variable is aggregate. 
+                        # Ideally, Simulation Engine should return WHO scored. 
+                        # For now, we trust MVP level aggregation.
+                        
+                        # Save
+                        db.add(db_char)
+                        # db.commit() # Commit is done at end of on_step
+            except Exception as e:
+                logger.error(f"Failed to update stats: {e}")
 
         # Construct BroadcastData
         # Need to map PlayerState to dict

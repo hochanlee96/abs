@@ -101,6 +101,17 @@ CREATE TABLE characters (
   power_left INT NOT NULL DEFAULT 0,
   power_right INT NOT NULL DEFAULT 0,
 
+  -- Cumulative Stats
+  total_games INT NOT NULL DEFAULT 0,
+  total_pa INT NOT NULL DEFAULT 0,
+  total_ab INT NOT NULL DEFAULT 0,
+  total_hits INT NOT NULL DEFAULT 0,
+  total_homeruns INT NOT NULL DEFAULT 0,
+  total_rbis INT NOT NULL DEFAULT 0,
+  total_runs INT NOT NULL DEFAULT 0,
+  total_bb INT NOT NULL DEFAULT 0,
+  total_so INT NOT NULL DEFAULT 0,
+
   -- Fielder Specific
   defense_range INT NOT NULL DEFAULT 50,
   defense_error INT NOT NULL DEFAULT 50,
