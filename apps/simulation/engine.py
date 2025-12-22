@@ -135,32 +135,53 @@ RESOLVER_PROMPT = """
 당신은 고도로 훈련된 **야구 시뮬레이션 심판(Umpire)이자 물리 엔진**입니다.
 주어진 데이터(선수 능력, 상황, 작전)와 **직전 검증 실패 피드백**를 분석하여 **가장 현실적이고 개연성 있는 경기 결과**를 도출하세요.
 
-**[중요] 생각의 사슬 (Chain of Thought) 필수**
-결과를 내기 전에 `reasoning` 필드에 다음 단계로 생각을 정리하세요.
-1.  **Matchup Analysis**: 투수의 구위/제구 vs 타자의 컨택/파워 비교. 누가 이겼는가?
-    *   **[Game Balance]**: 야구의 **평균 타율은 0.250~0.280**입니다. 70%%는 아웃되어야 합니다. 슈퍼스타도 3할대입니다.
-2.  **Contact Physics**: 타격이 이겼다면, 공이 어디로, 얼마나 빠르게, 어떤 각도로 날아갔는가? (Line Drive, Pop Fly, Grounder 등)
-3.  **Defense & Fielding**: 그 타구를 수비수가 잡을 수 있는가? (잡으면 아웃, 못 잡으면 안타)
-4.  **Final Decision (Action)**: 안타인가? 아웃인가? 2루타인가? 홈런인가? (진루/득점은 절대 계산하지 마세요. 그것은 규칙 엔진이 합니다.)
-5.  **Validation Feedback Check**: 이전 피드백을 반드시 반영하여 수정하세요.
+**[Realistic Balance: Game Balance]**
+- **"야구는 흐름(Flow)의 스포츠입니다."**:
+    - **Base Rate**: 기본적으로는 **타율 0.250 ~ 0.280** (아웃 70-75%)을 지향합니다.
+    - **Dynamic Modifiers (중요)**: 상황에 따라 확률을 과감하게 조정하세요.
+        1.  **Pitcher Stamina (체력)**:
+            - **High (80+)**: 투수 압도. 안타 확률 매우 낮음.
+            - **Medium (40-79)**: 대등한 승부.
+            - **Stamina Low (<40)**: **안타 확률 제한적 증가 (최대 타율 .300).** 투수가 지쳤어도 배팅볼 아님. **난타전 절대 금지.**
+        2.  **Clutch (득점권)**: `clutch` 스탯이 높은 타자는 주자가 있을 때 타율 보정.
+        3.  **Scoreless Streak**: 5이닝 이상 0-0이면, **타자들의 집중력이 올라가며 안타 확률을 소폭 상향**하여 경기의 균형을 깹니다.
+
+    **[Outcome Distribution Guide (Modified by Stamina)]**
+    - **Stamina High**: **아웃 80% / 안타 10% / 사사구 10%** (투수 우위)
+    - **Stamina Normal**: **아웃 75% / 안타 18% / 사사구 7%** (다소 투고타저 지향)
+    - **Stamina Low**: **아웃 65% / 단타(1B) 25% / 장타(2B/HR) 3% / 사사구 7%** (절대 안타가 50%를 넘지 말 것)
+
+3.  **Specific Description**
+    - 투수 체력이 낮을 때는 "밋밋하게 들어간 공", "스피드가 떨어진 직구" 등을 묘사하며 안타를 허용하세요.
+    - 잘 맞은 타구여도 야수 정면이면 아웃입니다. (단, 체력 저하 시에는 수비수 키를 넘기는 묘사 선호)
+
+4.  **Reasoning Guide (CoT)**
+    1.  **Check Stamina**: 투수 체력이 40 미만인가? -> 맞다면 'Hit' 가능성 최우선 검토.
+    2.  **Batter Skill**: 타자의 Contact/Power가 투수 구위를 압도하는가?
+    3.  **Final Decision**: 위 조건들을 종합하여 '무조건 아웃'이 아닌, 합리적인 흐름 선택.
+4.  **Feedback Check**: 이전 검증 피드백이 있다면 반드시 반영.
 
 **[Output Format]**
-*   `result_code`: **명확한 야구 기록 코드**를 사용하세요.
-    *   `1B`, `2B`, `3B`, `HR` (안타)
-    *   `BB`, `IBB`, `HBP` (사사구)
-    *   `SO` (삼진), `GO` (땅볼), `FO` (플라이), `LO` (직선타), `E` (실책)
-*   `description`: 경기 내용을 생생하게 중계 멘트로 작성하세요.
+- `result_code`: `1B`, `2B`, `3B`, `HR`, `BB`, `SO`, `GO`, `FO`, `LO`, `E` 중 택 1.
+- `description`: 생생한 문장형 묘사.
 
-**[Few-shot Examples (정답 노트)]**
-*   **Case 1 (단타)**
-    *   `result_code`: "1B"
-    *   `description`: "이정후가 투수 옆을 스치는 강한 타구로 중전 1루타를 만들어냅니다!"
-*   **Case 2 (삼진 아웃)**
-    *   `result_code`: "SO"
-    *   `description`: "바깥쪽 꽉 찬 직구에 방망이가 헛돌며 삼진 아웃!"
-*   **Case 3 (득점권 상황 2루타)**
+**[Current Game Context]**
+{game_info}
+
+
+**[Few-shot Examples]**
+*   **Case 1 (땅볼 아웃)**
+    *   `result_code`: "GO"
+    *   `description`: "유격수 깊은 타구! 잡아서 1루에... 아웃입니다! 간발의 차였습니다."
+*   **Case 2 (라인드라이브 아웃)**
+    *   `result_code`: "LO"
+    *   `description`: "잘 맞은 타구! 하지만 2루수 정면으로 향하며 직선타로 물러납니다."
+*   **Case 3 (2루타)**
     *   `result_code`: "2B"
-    *   `description`: "좌중간을 완전히 가르는 타구! 타자 주자는 여유 있게 2루까지 들어갑니다."
+    *   `description`: "우익수 키를 넘기는 큼지막한 타구! 타자 주자는 1루를 돌아 2루까지 여유 있게 들어갑니다."
+*   **Case 4 (홈런 - 파워히터)**
+    *   `result_code`: "HR"
+    *   `description`: "잡아당겼습니다! 이 타구는... 담장! 담장을 넘어갑니다! 장외로 사라지는 초대형 홈런!"
 
 [입력 데이터]
 [환경] 날씨: {weather}, 바람: {wind}, 심판 존: {zone}
@@ -183,8 +204,10 @@ VALIDATOR_PROMPT = """
 
 **[필수 검증 항목]**
 1.  **Result Consistency**: `result_code`와 `description`이 일치하는가?
+    - **CRITICAL**: **먼저 `result_code`를 확정하고, 그에 맞춰 `description`을 작성하세요.** (예: 2B인데 "홈런성 타구" 묘사 금지)
     *   Code는 `GO`(땅볼)인데 설명은 "담장을 넘깁니다!"면 Invalid.
 2.  **Context Consistency**: 상황에 맞는 결과인가?
+    *   **Context Consistency**: 상황에 맞는 결과인가?
     *   예: 투수가 `WALK` 상태가 아닌데 `BB`가 나오거나 하진 않는지(사실 이건 허용되지만, 터무니없는 상황 체크).
 
 [직전 상황]
@@ -368,12 +391,30 @@ def resolver_node(state: SimState):
             feedback = f"⚠️ [PREVIOUS FAILED]: {val_res.error_type} - {val_res.correction_suggestion}"
         
         runners_status = f"주자: 1루[{runners['runner_1']}], 2루[{runners['runner_2']}], 3루[{runners['runner_3']}]"
+        
+        # Build Game Info Context with STRICT RULES
+        score_diff = abs(game.home_score - game.away_score)
+        game_info_lines = [
+            f"- Inning: {game.inning} {game.half}",
+            f"- Score: Home {game.home_score} : Away {game.away_score}",
+            f"- Outs: {game.outs}",
+            f"- Runners: {runners_status}"
+        ]
+        
+        # Forced Rubber Banding
+        if game.inning >= 7 and game.home_score == 0 and game.away_score == 0:
+             game_info_lines.append("\n!!! NOTICE: 7이닝 이상 0-0입니다. [투수들의 집중력이 조금씩 떨어질 시점입니다]. !!!")
+        elif game.inning >= 10 and score_diff == 0:
+             game_info_lines.append("\n!!! NOTICE: 연장전 동점 상황입니다. [승부를 가를 수 있는 변수를 고려하세요]. !!!")
+
+        game_info_str = "\n".join(game_info_lines)
 
         res = chain.invoke({
+            "game_info": game_info_str,
             "weather": ctx.weather,
             "wind": ctx.wind_direction,
             "zone": ctx.umpire_zone,
-            "outs": game.outs,
+            "outs": game.outs, # Redundant but kept for safety
             "runners_status": runners_status,
             "defense_lineup": defense_lineup_str,
             "pitcher_name": pitcher.character.name,
@@ -688,7 +729,7 @@ def run_engine(
     
     # Run Graph
     step_count = 0
-    for s in app.stream(initial_state, config={"recursion_limit": 1000}):
+    for s in app.stream(initial_state, config={"recursion_limit": 3000}):
         if "update_state" in s:
             updated_game = s["update_state"]["game"]
             if on_step_callback:

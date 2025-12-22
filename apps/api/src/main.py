@@ -13,22 +13,42 @@ app = FastAPI(title="Baseball Sim API")
 
 @app.on_event("startup")
 def startup_event():
+    import time
+    from sqlalchemy.exc import OperationalError
     from .db import SessionLocal
     from . import crud_game
-    db = SessionLocal()
-    try:
-        trainings = crud_game.get_trainings(db)
-        if not trainings:
-            crud_game.create_training(db, "Weightlifting", power_delta=1)
-            crud_game.create_training(db, "Running", speed_delta=1)
-            crud_game.create_training(db, "Batting Practice", contact_delta=1)
-            print("Seeded initial trainings")
-    finally:
-        db.close()
+
+    print("DEBUG: Entering startup_event")
+    retries = 10
+    while retries > 0:
+        print(f"DEBUG: Attempting DB connection (Retry {11-retries})")
+        try:
+            db = SessionLocal()
+            try:
+                # Test connection and table existence
+                trainings = crud_game.get_trainings(db)
+                if not trainings:
+                    crud_game.create_training(db, "Weightlifting", power_delta=1)
+                    crud_game.create_training(db, "Running", speed_delta=1)
+                    crud_game.create_training(db, "Batting Practice", contact_delta=1)
+                    print("Seeded initial trainings")
+                break # Success
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"DB not ready yet, retrying in 2s... ({retries} left) Error: {e}")
+            retries -= 1
+            time.sleep(2)
+    else:
+        print("Failed to connect to DB after multiple retries.")
+        # We don't raise here to allow server to start even if seeding failed, 
+        # hoping it resolves later, or we let it crash?
+        # Better to let it crash if essential.
+        raise RuntimeError("Could not connect to Database for seeding.")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

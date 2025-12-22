@@ -1,30 +1,20 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from .models import PlateAppearance, ResultCode
+from .models import PlateAppearance, ResultCode, Character
 
 def get_character_stats(db: Session, character_id: int) -> dict:
-    # Get all PAs for this character
-    pas = db.execute(select(PlateAppearance).where(PlateAppearance.batter_character_id == character_id)).scalars().all()
+    char = db.query(Character).filter_by(character_id=character_id).first()
+    if not char:
+        return {}
     
-    games_played = len(set(pa.match_id for pa in pas))
-    total_pa = len(pas)
-    
-    # Simplified logic: Treat all PAs as At Bats for now (unless Walk/Sacrifice logic is added later)
-    at_bats = len([pa for pa in pas if pa.result_code != ResultCode.WALK])
-    
-    hits = len([pa for pa in pas if pa.result_code in [ResultCode.HIT, ResultCode.HOMERUN]])
-    homeruns = len([pa for pa in pas if pa.result_code == ResultCode.HOMERUN])
-    
-    # RBI logic (simplified as per previous implementation)
-    rbis = homeruns 
-    
-    avg = hits / at_bats if at_bats > 0 else 0.0
-    
+    # Calculate Average
+    avg = char.total_hits / char.total_ab if char.total_ab > 0 else 0.0
+
     return {
-        "games_played": games_played,
-        "at_bats": at_bats,
-        "hits": hits,
-        "homeruns": homeruns,
-        "rbis": rbis,
+        "games_played": char.total_games,
+        "at_bats": char.total_ab,
+        "hits": char.total_hits,
+        "homeruns": char.total_homeruns,
+        "rbis": char.total_rbis,
         "batting_average": round(avg, 3)
     }

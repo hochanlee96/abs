@@ -12,7 +12,7 @@ services:
       - ./initdb:/docker-entrypoint-initdb.d
       - mariadb_data:/var/lib/mysql
     healthcheck:
-      test: [ "CMD-SHELL", "mariadb-admin ping -h localhost -p${MARIADB_ROOT_PASSWORD}" ]
+      test: [ "CMD-SHELL", "mariadb-admin ping -h localhost -proot" ]
       interval: 5s
       timeout: 3s
       retries: 30
