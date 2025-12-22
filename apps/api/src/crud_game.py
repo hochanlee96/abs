@@ -177,10 +177,17 @@ def get_match(db: Session, match_id: int) -> Optional[Match]:
         )
     ).scalar_one_or_none()
 
-def get_next_scheduled_match(db: Session, world_id: Optional[int] = None) -> Optional[Match]:
+def get_next_scheduled_match(db: Session, world_id: Optional[int] = None, team_id: Optional[int] = None) -> Optional[Match]:
     query = select(Match).where(Match.status == MatchStatus.SCHEDULED)
     if world_id:
         query = query.where(Match.world_id == world_id)
+    if team_id:
+        from sqlalchemy import or_
+        query = query.where(or_(Match.home_team_id == team_id, Match.away_team_id == team_id))
+    
+    # Sort by scheduled_at if available to get the EARLIEST next match
+    query = query.order_by(Match.scheduled_at.asc())
+    
     return db.execute(query.limit(1)).scalar_one_or_none()
 
 def update_match_status(db: Session, match_id: int, status: MatchStatus) -> Optional[Match]:

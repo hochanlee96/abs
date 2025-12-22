@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from ..db import get_db
 from .. import crud_game
+from .. import models as db_models
 from ..models import MatchStatus
 from ..auth_google import verify_google_id_token_from_header
 from ..crud_accounts import upsert_account_from_google
@@ -170,20 +171,76 @@ class PlayRequest(BaseModel):
     world_id: Optional[int] = None
 
 @router.post("/play")
-def play_match(body: PlayRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def play_match(body: PlayRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db), payload: dict = Depends(get_auth_payload)):
     """
-    Finds the next SCHEDULED match and starts the simulation in background.
+    Finds the next SCHEDULED match for the USER's team and starts the simulation in background.
     """
-    # 1. Find a generic scheduled match (or create one for testing?)
-    # For now, just pick the first SCHEDULED match.
-    match = crud_game.get_next_scheduled_match(db, body.world_id)
-    if not match:
-        raise HTTPException(status_code=404, detail="No scheduled matches found")
+    # 0. Redundant Alias for robust scope (belt and suspenders)
+    Character = db_models.Character
+    TeamPlayer = db_models.TeamPlayer
     
-    # 2. Start Background Task
+    # 1. Identify User and their Team
+    acc = upsert_account_from_google(db, payload)
+    # Get the user's first character in this world (or any character they own)
+    char = db.query(db_models.Character).filter_by(owner_account_id=acc.account_id).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="No character found for user")
+    
+    # Get user's team
+    team_player = db.query(db_models.TeamPlayer).filter_by(character_id=char.character_id).first()
+    if not team_player:
+        raise HTTPException(status_code=404, detail="User character is not on a team")
+    
+    user_team_id = team_player.team_id
+    
+    # 2. Find any NPC matches scheduled BEFORE the user's next match
+    # We want to clear the queue so the league progresses.
+    # Logic: Get the very next scheduled match in the world.
+    # If it doesn't involve the user, mark it as SIMULATED (Finished) and move on.
+    
+    # Limit to e.g. 5 skips to avoid infinite loops or massive jumps
+    skipped_count = 0
+    while skipped_count < 10:
+        next_global_match = crud_game.get_next_scheduled_match(db, body.world_id)
+        if not next_global_match:
+            break
+            
+        if next_global_match.home_team_id == user_team_id or next_global_match.away_team_id == user_team_id:
+            # Found user match!
+            break
+        
+        # Skip this NPC-only match (Mark as finished)
+        next_global_match.status = MatchStatus.FINISHED
+        # Assign a random score 1-5 for flavor
+        import random
+        next_global_match.home_score = random.randint(0, 5)
+        next_global_match.away_score = random.randint(0, 5)
+        # Record who won
+        if next_global_match.home_score > next_global_match.away_score:
+            next_global_match.winner_team_id = next_global_match.home_team_id
+            next_global_match.loser_team_id = next_global_match.away_team_id
+        else:
+            next_global_match.winner_team_id = next_global_match.away_team_id
+            next_global_match.loser_team_id = next_global_match.home_team_id
+            
+        db.add(next_global_match)
+        db.commit()
+        skipped_count += 1
+    
+    # 3. Now get the User's next match
+    match = crud_game.get_next_scheduled_match(db, body.world_id, team_id=user_team_id)
+    if not match:
+        raise HTTPException(status_code=404, detail="No more scheduled matches found for your team.")
+    
+    # 4. Start Background Task
     background_tasks.add_task(run_match_background, match.match_id)
     
-    return {"status": "started", "match_id": match.match_id, "message": "Simulation started in background"}
+    return {
+        "status": "started", 
+        "match_id": match.match_id, 
+        "message": f"Simulation started for your team! (Skipped {skipped_count} NPC games)",
+        "skipped": skipped_count
+    }
 
 
 @router.get("/trainings")
