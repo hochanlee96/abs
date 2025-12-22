@@ -108,6 +108,11 @@ class Character(Base):
     power_left: Mapped[int] = mapped_column(Integer, default=0)
     power_right: Mapped[int] = mapped_column(Integer, default=0)
     
+    # XP and Leveling (Added for Persistence)
+    contact_xp: Mapped[int] = mapped_column(Integer, default=0)
+    power_xp: Mapped[int] = mapped_column(Integer, default=0)
+    speed_xp: Mapped[int] = mapped_column(Integer, default=0)
+    
     # Cumulative Stats (Synced with Simulation)
     total_games: Mapped[int] = mapped_column(Integer, default=0)
     total_pa: Mapped[int] = mapped_column(Integer, default=0)
@@ -157,6 +162,12 @@ class Match(Base):
     game_state: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     winner_team_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     loser_team_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    
+    match_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    scheduled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.current_timestamp())
 
     world: Mapped["World"] = relationship(back_populates="matches")
     home_team: Mapped["Team"] = relationship(foreign_keys=[home_team_id], back_populates="home_matches")
@@ -194,7 +205,16 @@ class TrainingSession(Base):
     training_session_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     character_id: Mapped[int] = mapped_column(ForeignKey("characters.character_id"), nullable=False)
     training_id: Mapped[int] = mapped_column(ForeignKey("trainings.training_id"), nullable=False)
+    
     performed_at: Mapped[datetime] = mapped_column(DateTime(3), server_default=func.current_timestamp())
+    
+    # Track exactly what was gained in this session
+    applied_contact_delta: Mapped[int] = mapped_column(Integer, default=0)
+    applied_power_delta: Mapped[int] = mapped_column(Integer, default=0)
+    applied_speed_delta: Mapped[int] = mapped_column(Integer, default=0)
+    
+    xp_gained: Mapped[int] = mapped_column(Integer, default=0)
+    is_critical: Mapped[bool] = mapped_column(Boolean, default=False)
 
     character: Mapped["Character"] = relationship(back_populates="training_sessions")
     training: Mapped["Training"] = relationship(back_populates="training_sessions")

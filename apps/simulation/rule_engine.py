@@ -32,7 +32,7 @@ class BaseballRuleEngine:
              runs_this_play = BaseballRuleEngine._handle_walk(game, current_batter)
         
         # 2. Handle Outs
-        elif "OUT" in code or "STRIKEOUT" in code or "SO" in code or "GO" in code or "FO" in code:
+        elif "OUT" in code or "STRIKEOUT" in code or "SO" in code or "GO" in code or "FO" or "LO" in code:
              runs_this_play = BaseballRuleEngine._handle_out(game)
              
         # 3. Update Score

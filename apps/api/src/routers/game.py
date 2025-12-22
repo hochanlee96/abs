@@ -190,10 +190,14 @@ def list_trainings(db: Session = Depends(get_db)):
 
 @router.post("/characters/{character_id}/train")
 def perform_training(character_id: int, body: TrainingPerform, db: Session = Depends(get_db)):
-    char = crud_game.perform_training(db, character_id, body.training_id)
-    if not char:
-        raise HTTPException(status_code=400, detail="Training failed (Character or Training not found)")
-    return char
+    result = crud_game.perform_training(db, character_id, body.training_id)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@router.get("/characters/{character_id}/training-status")
+def get_training_status(character_id: int, db: Session = Depends(get_db)):
+    return crud_game.get_training_status(db, character_id)
 
 @router.get("/me/characters")
 def list_my_characters(db: Session = Depends(get_db), payload: dict = Depends(get_auth_payload)):

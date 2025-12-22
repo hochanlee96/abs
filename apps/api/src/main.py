@@ -28,9 +28,9 @@ def startup_event():
                 # Test connection and table existence
                 trainings = crud_game.get_trainings(db)
                 if not trainings:
-                    crud_game.create_training(db, "Weightlifting", power_delta=1)
-                    crud_game.create_training(db, "Running", speed_delta=1)
                     crud_game.create_training(db, "Batting Practice", contact_delta=1)
+                    crud_game.create_training(db, "Weightlifting", power_delta=1)
+                    crud_game.create_training(db, "Sprint Drills", speed_delta=1)
                     print("Seeded initial trainings")
                 break # Success
             finally:

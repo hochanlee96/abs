@@ -23,6 +23,9 @@ export interface Character {
   contact: number;
   power: number;
   speed: number;
+  contact_xp: number;
+  power_xp: number;
+  speed_xp: number;
   created_at: string;
   is_user_created: boolean;
 }
@@ -166,27 +169,47 @@ export async function apiListTrainings(idToken?: string): Promise<Training[]> {
   return res.json();
 }
 
+export interface TrainingStatus {
+  is_locked: boolean;
+  reason: string | null;
+  last_training: string | null;
+  last_match: string | null;
+}
+
+export async function apiGetTrainingStatus(idToken: string, characterId: number): Promise<TrainingStatus> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/characters/${characterId}/training-status`, {
+    headers: { Authorization: `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error("Failed to fetch training status");
+  return res.json();
+}
+
+export interface TrainingResult {
+  success: boolean;
+  character: Character;
+  xp_gained: number;
+  is_critical: boolean;
+  leveled_up: boolean;
+  new_level: number | null;
+}
+
 export async function apiPerformTraining(
   characterId: number,
   trainingId: number,
-  idToken?: string
-): Promise<Character> {
+  idToken: string
+): Promise<TrainingResult> {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/characters/${characterId}/train`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {})
+      "Authorization": `Bearer ${idToken}`
     },
     body: JSON.stringify({ training_id: trainingId })
   });
 
   if (!res.ok) {
-    let msg = `API error: ${res.status}`;
-    try {
-      const err = await res.json();
-      msg = err?.detail || msg;
-    } catch { }
-    throw new Error(msg);
+    const errorData = await res.json();
+    throw new Error(errorData.detail || "Training failed");
   }
   return res.json();
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import styles from "../styles/Training.module.css";
-import { apiGetMyCharacter } from "../lib/api";
+import { apiGetMyCharacter, apiPerformTraining, apiGetTrainingStatus, TrainingStatus } from "../lib/api";
 
 type StatType = "contact" | "power" | "speed";
 
@@ -11,13 +11,10 @@ interface CharacterWithXP {
     nickname: string;
     contact: number;
     contact_xp: number;
-    contact_xp_needed: number;
     power: number;
     power_xp: number;
-    power_xp_needed: number;
     speed: number;
     speed_xp: number;
-    speed_xp_needed: number;
 }
 
 interface Training {
@@ -44,9 +41,11 @@ export default function TrainingPage() {
 
     const [loading, setLoading] = useState(false);
     const [character, setCharacter] = useState<CharacterWithXP | null>(null);
+    const [trainingStatus, setTrainingStatus] = useState<TrainingStatus | null>(null);
     const [trainingLogs, setTrainingLogs] = useState<TrainingLog[]>([]);
     const [showLevelUp, setShowLevelUp] = useState<{ stat: StatType; newLevel: number } | null>(null);
     const [showBonus, setShowBonus] = useState<{ message: string; xp: number } | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     // Dummy trainings data
     const trainings: Training[] = [
@@ -91,106 +90,81 @@ export default function TrainingPage() {
 
             const char = await apiGetMyCharacter(token);
             if (char) {
-                // Map API character to CharacterWithXP
-                // If XP fields are missing (from backend/fresh creation), initialize them
-                const charWithXP: CharacterWithXP = {
+                setCharacter({
                     character_id: char.character_id,
                     nickname: char.nickname,
                     contact: char.contact,
-                    contact_xp: (char as any).contact_xp || 0,
-                    contact_xp_needed: (char as any).contact_xp_needed || char.contact * 50,
+                    contact_xp: char.contact_xp,
                     power: char.power,
-                    power_xp: (char as any).power_xp || 0,
-                    power_xp_needed: (char as any).power_xp_needed || char.power * 50,
+                    power_xp: char.power_xp,
                     speed: char.speed,
-                    speed_xp: (char as any).speed_xp || 0,
-                    speed_xp_needed: (char as any).speed_xp_needed || char.speed * 50,
-                };
-                setCharacter(charWithXP);
+                    speed_xp: char.speed_xp,
+                });
+
+                // Fetch training status
+                const status = await apiGetTrainingStatus(token, char.character_id);
+                setTrainingStatus(status);
             } else {
-                // No character found, redirect to create
                 router.push("/character");
             }
         } catch (e) {
-            console.error("Failed to load character", e);
+            console.error("Failed to load character or training status", e);
         }
     };
 
-    const handleTrain = (training: Training) => {
-        if (!character) return;
-
+    const handleTrain = async (training: Training) => {
+        if (!character || !session) return;
         setLoading(true);
+        setError(null);
 
-        // Simulate API call delay
-        setTimeout(() => {
-            const updatedCharacter = { ...character };
-            const statXpKey = `${training.stat_type}_xp` as keyof CharacterWithXP;
-            const statXpNeededKey = `${training.stat_type}_xp_needed` as keyof CharacterWithXP;
-            const statLevelKey = training.stat_type as keyof CharacterWithXP;
+        try {
+            const token = (session as any)?.id_token;
+            const result = await apiPerformTraining(character.character_id, training.training_id, token);
 
-            let currentXp = updatedCharacter[statXpKey] as number;
-            let xpNeeded = updatedCharacter[statXpNeededKey] as number;
-            let currentLevel = updatedCharacter[statLevelKey] as number;
+            if (result.success) {
+                // Update character local state
+                const char = result.character;
+                setCharacter({
+                    character_id: char.character_id,
+                    nickname: char.nickname,
+                    contact: char.contact,
+                    contact_xp: char.contact_xp,
+                    power: char.power,
+                    power_xp: char.power_xp,
+                    speed: char.speed,
+                    speed_xp: char.speed_xp,
+                });
 
-            // Random XP gain (10-35 range)
-            const baseXp = Math.floor(Math.random() * 26) + 10; // Random 10-35
+                // Update lock status
+                setTrainingStatus(prev => prev ? { ...prev, is_locked: true } : null);
 
-            // Random critical training (20% chance for 2x XP)
-            const isCritical = Math.random() < 0.2;
-            let xpGained = baseXp;
-            if (isCritical) {
-                xpGained *= 2;
-                setShowBonus({ message: "🌟 Critical Training!", xp: xpGained });
-                setTimeout(() => setShowBonus(null), 2000);
+                // UI Notifications
+                if (result.is_critical) {
+                    setShowBonus({ message: "🌟 Critical Training!", xp: result.xp_gained });
+                    setTimeout(() => setShowBonus(null), 2000);
+                }
+
+                if (result.leveled_up) {
+                    setShowLevelUp({ stat: training.stat_type, newLevel: result.new_level || 0 });
+                    setTimeout(() => setShowLevelUp(null), 3000);
+                }
+
+                // Log
+                const newLog: TrainingLog = {
+                    id: Date.now(),
+                    training_name: training.name,
+                    stat_type: training.stat_type,
+                    xp_gained: result.xp_gained,
+                    timestamp: new Date(),
+                    isCritical: result.is_critical
+                };
+                setTrainingLogs(prev => [newLog, ...prev].slice(0, 5));
             }
-
-            // Add XP
-            currentXp += xpGained;
-
-            // Check for level up
-            let leveledUp = false;
-            while (currentXp >= xpNeeded) {
-                currentXp -= xpNeeded;
-                currentLevel += 1;
-                xpNeeded = currentLevel * 50; // Scaling: 50 XP per level (level 1 = 50, level 2 = 100, level 3 = 150, etc.)
-                leveledUp = true;
-            }
-
-            // Update character
-            (updatedCharacter[statXpKey] as number) = currentXp;
-            (updatedCharacter[statXpNeededKey] as number) = xpNeeded;
-            (updatedCharacter[statLevelKey] as number) = currentLevel;
-
-            setCharacter(updatedCharacter);
-
-            // Save to local storage to persist XP
-            if (typeof window !== 'undefined') {
-                // We need to merge the XP data with the base character data stored in api.ts
-                // But since api.ts stores the whole object, we can just update it.
-                // However, api.ts might have different structure.
-                // Let's just save this CharacterWithXP object as the source of truth for now.
-                localStorage.setItem('abs_character_data', JSON.stringify(updatedCharacter));
-            }
-
-            // Add to training log
-            const newLog: TrainingLog = {
-                id: Date.now(),
-                training_name: training.name,
-                stat_type: training.stat_type,
-                xp_gained: xpGained,
-                timestamp: new Date(),
-                isCritical
-            };
-            setTrainingLogs(prev => [newLog, ...prev].slice(0, 10)); // Keep last 10
-
-            // Show level up animation if leveled up
-            if (leveledUp) {
-                setShowLevelUp({ stat: training.stat_type, newLevel: currentLevel });
-                setTimeout(() => setShowLevelUp(null), 3000);
-            }
-
+        } catch (e: any) {
+            setError(e.message || "Training failed");
+        } finally {
             setLoading(false);
-        }, 500);
+        }
     };
 
     const getStatColor = (stat: StatType) => {
@@ -270,13 +244,13 @@ export default function TrainingPage() {
                             <div
                                 className={styles.progressFill}
                                 style={{
-                                    width: `${(character.contact_xp / character.contact_xp_needed) * 100}%`,
+                                    width: `${(character.contact_xp / (character.contact * 50)) * 100}%`,
                                     backgroundColor: getStatColor("contact")
                                 }}
                             />
                         </div>
                         <div className={styles.xpText}>
-                            {character.contact_xp} / {character.contact_xp_needed} XP
+                            {character.contact_xp} / {character.contact * 50} XP
                         </div>
                     </div>
 
@@ -293,13 +267,13 @@ export default function TrainingPage() {
                             <div
                                 className={styles.progressFill}
                                 style={{
-                                    width: `${(character.power_xp / character.power_xp_needed) * 100}%`,
+                                    width: `${(character.power_xp / (character.power * 50)) * 100}%`,
                                     backgroundColor: getStatColor("power")
                                 }}
                             />
                         </div>
                         <div className={styles.xpText}>
-                            {character.power_xp} / {character.power_xp_needed} XP
+                            {character.power_xp} / {character.power * 50} XP
                         </div>
                     </div>
 
@@ -316,13 +290,13 @@ export default function TrainingPage() {
                             <div
                                 className={styles.progressFill}
                                 style={{
-                                    width: `${(character.speed_xp / character.speed_xp_needed) * 100}%`,
+                                    width: `${(character.speed_xp / (character.speed * 50)) * 100}%`,
                                     backgroundColor: getStatColor("speed")
                                 }}
                             />
                         </div>
                         <div className={styles.xpText}>
-                            {character.speed_xp} / {character.speed_xp_needed} XP
+                            {character.speed_xp} / {character.speed * 50} XP
                         </div>
                     </div>
                 </div>
@@ -330,10 +304,22 @@ export default function TrainingPage() {
 
             {/* Training Options */}
             <div className={styles.trainingsSection}>
-                <h3>Available Training</h3>
+                {trainingStatus?.is_locked && (
+                    <div className={styles.lockBanner}>
+                        <span className={styles.lockIcon}>🔒</span>
+                        {trainingStatus.reason || "Run a game before continuing training"}
+                    </div>
+                )}
+
+                {error && (
+                    <div className={styles.errorBanner}>
+                        {error}
+                    </div>
+                )}
+
                 <div className={styles.trainingsGrid}>
                     {trainings.map(training => (
-                        <div key={training.training_id} className={styles.trainingCard}>
+                        <div key={training.training_id} className={styles.trainingCard} style={trainingStatus?.is_locked ? { opacity: 0.6 } : {}}>
                             <div className={styles.trainingIcon}>{training.icon}</div>
                             <h4 className={styles.trainingName}>{training.name}</h4>
                             <p className={styles.trainingDescription}>{training.description}</p>
@@ -343,9 +329,9 @@ export default function TrainingPage() {
                             <button
                                 className={styles.trainButton}
                                 onClick={() => handleTrain(training)}
-                                disabled={loading}
+                                disabled={loading || trainingStatus?.is_locked}
                             >
-                                {loading ? "Training..." : "Train"}
+                                {loading ? "Training..." : trainingStatus?.is_locked ? "Locked" : "Train"}
                             </button>
                         </div>
                     ))}
